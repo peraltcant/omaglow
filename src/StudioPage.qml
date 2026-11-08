@@ -16,17 +16,19 @@ ScrollView {
     // Effects that use the colors, and the ones where random colors make sense.
     // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
     // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
-    // then the live ones: Music, Workspaces, Meter, Notifications.
+    // then the live ones: Music, Workspaces, Meter, Notifications, Timer.
     readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true]
     readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true]
     readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
-                                       false, true, false, true, false, false, false, false, false, false]
+                                       false, true, false, true, false, false, false, false, false, false, false]
     // Still effects, and live ones that follow their source, have no speed.
     readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
-                                      true, true, true, true, true, false, false, false, false, false]
+                                      true, true, true, true, true, false, false, false, false, false, false]
     readonly property int meterEffect: 17
+    readonly property int timerEffect: 19
+    readonly property var timerMinutes: [5, 15, 25, 45, 60]
     // 0 one color, 1 two colors, 2 random; one color is the same color twice.
     readonly property int colorMode: !current ? -1
         : current.randomColors && usesRandom[current.effect] ? 2
@@ -274,6 +276,22 @@ ScrollView {
                             options: [qsTr("CPU"), qsTr("Temperature"), qsTr("Battery")]
                             current: page.current ? page.current.option : -1
                             onPicked: (i) => backend.setLayerOption(page.layerIndex, i)
+                        }
+                    }
+                    ColumnLayout {
+                        visible: page.current !== null && page.current.effect === page.timerEffect
+                        spacing: 8
+                        Label { text: qsTr("Minutes") }
+                        Segmented {
+                            options: page.timerMinutes.map(m => String(m))
+                            // No minutes set means 25.
+                            current: page.current ? page.timerMinutes.indexOf(page.current.option || 25) : -1
+                            onPicked: (i) => backend.setLayerOption(page.layerIndex, page.timerMinutes[i])
+                        }
+                        Button {
+                            text: backend.timerRunning ? qsTr("Stop timer") : qsTr("Start timer")
+                            icon.source: backend.timerRunning ? "qrc:/icons/square.svg" : "qrc:/icons/timer.svg"
+                            onClicked: backend.timerRunning ? backend.stopTimer() : backend.startTimer()
                         }
                     }
                     Segmented {

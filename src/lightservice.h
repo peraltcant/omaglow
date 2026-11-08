@@ -52,5 +52,6 @@ private:
     Design::ProfileLighting m_streamed;
     QFileSystemWatcher m_watcher;
     LiveFeed m_live; // what live layers show, gathered while they are shown
+    qint64 m_timerStartedAt = 0; // from the settings, as the app starts and stops the timer
     QTimer m_reload;
 };

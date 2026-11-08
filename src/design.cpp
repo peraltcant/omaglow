@@ -235,6 +235,24 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             c = value > 0 && across(x) <= value + 1e-9 ? mixed(layer.color1, layer.color2, danger) : QColor(0, 0, 0);
             break;
         }
+        case Timer: {
+            // Ready in the first color; while running the keys go dark from
+            // the right; when done they blink in the second color for a minute.
+            const qint64 duration = qint64(layer.option > 0 ? layer.option : DefaultTimerMinutes) * 60000;
+            const qint64 elapsed = live.now - live.timerStartedAt;
+            if (live.timerStartedAt <= 0 || elapsed < 0 || elapsed >= duration + TimerDoneMs)
+                c = layer.color1;
+            else if (elapsed >= duration)
+                c = (ms / 500) % 2 ? QColor(0, 0, 0) : layer.color2;
+            else {
+                // Each key holds its share of the time, the rightmost going first.
+                int rank = 0;
+                for (int other : layer.keys)
+                    rank += centerOf(other) < x;
+                c = 1 - double(elapsed) / duration > double(rank) / layer.keys.size() ? layer.color1 : QColor(0, 0, 0);
+            }
+            break;
+        }
         case Notifications: {
             // Four blinks over two seconds, the colors taking turns; otherwise
             // the keys show what is under the layer.
@@ -278,6 +296,8 @@ int liveNeeds(const ProfileLighting &lighting) {
             needs |= NeedsSystem;
         else if (layer.effect == Notifications)
             needs |= NeedsNotifications;
+        else if (layer.effect == Timer)
+            needs |= NeedsTimer;
     }
     return needs;
 }

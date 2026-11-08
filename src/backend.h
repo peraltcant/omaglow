@@ -52,6 +52,8 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList layers READ layers NOTIFY lightingChanged)
     // Moving layers are streamed by the background service.
     Q_PROPERTY(bool animatedLighting READ animatedLighting NOTIFY lightingChanged)
+    // The timer layers' countdown, shared by all of them.
+    Q_PROPERTY(bool timerRunning READ timerRunning NOTIFY timerChanged)
     Q_PROPERTY(QStringList layerEffects READ layerEffects CONSTANT)
 
     Q_PROPERTY(bool oledOn READ oledOn WRITE setOledOn NOTIFY oledChanged)
@@ -161,8 +163,12 @@ public:
     Q_INVOKABLE void renameLayer(int index, const QString &name);
     Q_INVOKABLE void setLayerEffect(int index, int effect);
     Q_INVOKABLE void setLayerSpeed(int index, int speed);
-    // What some effects need besides colors: a meter's source (Design::MeterSource).
+    // What some effects need besides colors: a meter's source (Design::MeterSource),
+    // a timer's minutes (1-120).
     Q_INVOKABLE void setLayerOption(int index, int option);
+    bool timerRunning() const;
+    Q_INVOKABLE void startTimer();
+    Q_INVOKABLE void stopTimer();
     // which: 0 for the first color, 1 for the second.
     Q_INVOKABLE void setLayerColor(int index, int which, const QColor &color);
     Q_INVOKABLE void setLayerRandom(int index, bool on);
@@ -278,6 +284,7 @@ public:
     Q_INVOKABLE void flush();
 
 signals:
+    void timerChanged();
     void connectionChanged();
     void errorChanged();
     void busyChanged();

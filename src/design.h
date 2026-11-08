@@ -37,7 +37,7 @@ enum LayerEffect {
     StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current,
     Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
     // Live ones, drawn from what the lights service gathers (Live below).
-    Music, Workspaces, Meter, Notifications,
+    Music, Workspaces, Meter, Notifications, Timer,
     LayerEffectCount
 };
 
@@ -51,13 +51,20 @@ struct Live {
     double temperature = -1;  // CPU package, °C
     double battery = -1;      // laptop charge, 0-100
     qint64 notifiedAt = -1;   // when the last notification came, on the render clock
+    qint64 timerStartedAt = 0; // wall clock ms since the epoch, 0 when stopped
+    qint64 now = 0;            // wall clock ms since the epoch
 };
+
+// A timer layer's minutes when its option is 0.
+constexpr int DefaultTimerMinutes = 25;
+// How long a finished timer blinks before it is ready again.
+constexpr qint64 TimerDoneMs = 60000;
 
 // What a meter layer shows (its option).
 enum MeterSource { CpuMeter, TemperatureMeter, BatteryMeter, MeterSourceCount };
 
 // Which live inputs a lighting's layers use.
-enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2, NeedsSystem = 4, NeedsNotifications = 8 };
+enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2, NeedsSystem = 4, NeedsNotifications = 8, NeedsTimer = 16 };
 
 // A group of keys with one effect. Later layers cover earlier ones.
 struct Layer {
@@ -67,7 +74,7 @@ struct Layer {
     QColor color1 = QColor(255, 255, 255);
     QColor color2 = QColor(0, 0, 255);
     bool randomColors = false;
-    int option = 0;  // what some effects need besides colors: a meter's source
+    int option = 0;  // what some effects need besides colors: a meter's source, a timer's minutes
     QList<int> keys; // key codes, in the order they were added
 };
 

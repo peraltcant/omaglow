@@ -241,5 +241,9 @@
   "Notifications": "Notificaciones",
   "Shows": "Muestra",
   "CPU": "CPU",
-  "Temperature": "Temperatura"
+  "Temperature": "Temperatura",
+  "Timer": "Temporizador",
+  "Minutes": "Minutos",
+  "Start timer": "Iniciar temporizador",
+  "Stop timer": "Detener temporizador"
 }

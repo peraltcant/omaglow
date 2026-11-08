@@ -1,5 +1,6 @@
 #include "lightservice.h"
 
+#include <QDateTime>
 #include <QDebug>
 #include <QFileInfo>
 #include <QThread>
@@ -89,6 +90,7 @@ void LightService::tick() {
                                int(Protocol::DefaultProfile));
     m_streamed = Design::load(*m_settings, profile); // edits show on the next frame
     m_live.setNeeds(Design::animated(m_streamed) ? Design::liveNeeds(m_streamed) : 0);
+    m_timerStartedAt = m_settings->value("timer/startedAt", 0).toLongLong();
     if (!Design::animated(m_streamed)) {
         // The app draws still lighting itself.
         if (m_frameTimer.isActive())
@@ -115,8 +117,11 @@ void LightService::sendFrame() {
         }
         m_startedAt = now;
     }
+    Design::Live live = m_live.snapshot();
+    live.timerStartedAt = m_timerStartedAt;
+    live.now = QDateTime::currentMSecsSinceEpoch();
     const QList<QByteArray> packets =
-        Design::packets(Design::render(m_streamed, m_clock.elapsed(), m_live.snapshot()), m_streamed.lighting.brightness);
+        Design::packets(Design::render(m_streamed, m_clock.elapsed(), live), m_streamed.lighting.brightness);
     // Try again from the next check, when the keyboard may be back.
     if (!sendAll(packets))
         m_frameTimer.stop();

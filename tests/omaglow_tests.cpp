@@ -1,3 +1,4 @@
+#include <QDateTime>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -543,6 +544,49 @@ private slots:
         QCOMPARE(LiveFeed::readTemperature(sys.path()), 55.0);
         QCOMPARE(LiveFeed::readBattery(sys.path()), 42.0);
         QCOMPARE(LiveFeed::readBattery(sys.path() + "/missing"), -1.0);
+    }
+
+    void timerLayersCountDown()
+    {
+        QList<int> numbers; // 1-0 on the number row
+        for (const auto &k : Keymap::layout())
+            if (QChar(k.label[0]).isDigit() && k.label[1] == 0)
+                numbers.append(k.code);
+        QCOMPARE(numbers.size(), 10);
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        Design::Layer layer;
+        layer.color1 = QColor("#00ff00");
+        layer.color2 = QColor("#ff0000");
+        layer.effect = Design::Timer;
+        layer.option = 10; // minutes
+        layer.keys = numbers;
+        lighting.layers = {layer};
+        const qint64 start = 1700000000000, minute = 60000;
+        auto at = [&](qint64 started, qint64 now, qint64 ms = 0) {
+            Design::Live live;
+            live.timerStartedAt = started;
+            live.now = now;
+            return Design::render(lighting, ms, live);
+        };
+        const int first = numbers.first(), last = numbers.last();
+
+        // Stopped: the whole row is ready in the first color.
+        QCOMPARE(at(0, start).value(first), QColor("#00ff00"));
+        QCOMPARE(at(0, start).value(last), QColor("#00ff00"));
+        // Half way: the right half has gone dark.
+        QCOMPARE(at(start, start + 5 * minute).value(first), QColor("#00ff00"));
+        QCOMPARE(at(start, start + 5 * minute).value(last), QColor(0, 0, 0));
+        QCOMPARE(at(start, start + 1000).value(last), QColor("#00ff00"));
+        // Done: the row blinks in the second color for a minute, then is ready again.
+        QCOMPARE(at(start, start + 10 * minute, 0).value(first), QColor("#ff0000"));
+        QCOMPARE(at(start, start + 10 * minute, 600).value(first), QColor(0, 0, 0));
+        QCOMPARE(at(start, start + 12 * minute).value(last), QColor("#00ff00"));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsTimer));
+        // No minutes set means 25.
+        lighting.layers[0].option = 0;
+        QCOMPARE(at(start, start + 20 * minute).value(first), QColor("#00ff00"));
+        QCOMPARE(at(start, start + 24 * minute).value(last), QColor(0, 0, 0));
     }
 
     void layerEffectsMoveOverTime()
@@ -2006,6 +2050,32 @@ private slots:
         QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), int(Design::BatteryMeter));
         backend->setLayerEffect(index, Design::Fire);
         QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 0);
+    }
+
+    void timerStartsAndStops()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
+        QVERIFY(!backend->timerRunning());
+        backend->startTimer();
+        QVERIFY(backend->timerRunning());
+        // The lights service reads the start from the settings.
+        QSettings settings(dir.path() + "/settings.ini", QSettings::IniFormat);
+        const qint64 started = settings.value("timer/startedAt").toLongLong();
+        QVERIFY(qAbs(started - QDateTime::currentMSecsSinceEpoch()) < 5000);
+        backend->stopTimer();
+        QVERIFY(!backend->timerRunning());
+        settings.sync();
+        QCOMPARE(settings.value("timer/startedAt", 0).toLongLong(), 0);
+
+        const int index = backend->addLayer("");
+        backend->setLayerEffect(index, Design::Timer);
+        backend->setLayerOption(index, 45);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 45);
+        backend->setLayerOption(index, 500);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 45);
     }
 
     void lightServicePacesItsReports()

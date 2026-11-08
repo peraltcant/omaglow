@@ -447,7 +447,7 @@ QStringList Backend::layerEffects() const {
     return {tr("Static"), tr("Breathing"), tr("Strobing"), tr("Color cycle"),
             tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current"),
             tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient"),
-            tr("Music"), tr("Workspaces"), tr("Meter"), tr("Notifications")};
+            tr("Music"), tr("Workspaces"), tr("Meter"), tr("Notifications"), tr("Timer")};
 }
 
 // A layer edit shows the custom lighting; false for an index out of range.
@@ -503,8 +503,11 @@ void Backend::setLayerEffect(int index, int effect) {
 void Backend::setLayerOption(int index, int option) {
     if (!editLayer(index))
         return;
-    const int count = m_layers[index].effect == Design::Meter ? Design::MeterSourceCount : 1;
-    if (option < 0 || option >= count)
+    const int effect = m_layers[index].effect;
+    const bool fits = effect == Design::Meter   ? option >= 0 && option < Design::MeterSourceCount
+                      : effect == Design::Timer ? option >= 1 && option <= 120
+                                                : option == 0;
+    if (!fits)
         return;
     m_layers[index].option = option;
     scheduleLighting();
@@ -548,7 +551,11 @@ void Backend::setLayerKeys(int index, const QList<int> &codes, bool add) {
 
 QVariantMap Backend::frameAt(qint64 ms) const {
     QVariantMap map;
-    const Design::Keys frame = Design::render(current(), ms, Design::demoLive(ms));
+    // Made-up audio and system values, but the real timer.
+    Design::Live live = Design::demoLive(ms);
+    live.timerStartedAt = m_settings->value("timer/startedAt", 0).toLongLong();
+    live.now = QDateTime::currentMSecsSinceEpoch();
+    const Design::Keys frame = Design::render(current(), ms, live);
     for (auto it = frame.begin(); it != frame.end(); ++it)
         map.insert(QString::number(it.key()), it.value());
     return map;
@@ -1306,4 +1313,21 @@ void Backend::deleteLook(int index) {
         return;
     m_looks.removeAt(index);
     storeLooks();
+}
+
+bool Backend::timerRunning() const {
+    return m_settings->value("timer/startedAt", 0).toLongLong() > 0;
+}
+
+// The lights service picks the start up from the settings, as it does edits.
+void Backend::startTimer() {
+    m_settings->setValue("timer/startedAt", QDateTime::currentMSecsSinceEpoch());
+    m_settings->sync();
+    emit timerChanged();
+}
+
+void Backend::stopTimer() {
+    m_settings->remove("timer/startedAt");
+    m_settings->sync();
+    emit timerChanged();
 }
