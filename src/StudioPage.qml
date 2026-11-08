@@ -16,16 +16,17 @@ ScrollView {
     // Effects that use the colors, and the ones where random colors make sense.
     // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
     // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
-    // then the live ones: Music, Workspaces.
+    // then the live ones: Music, Workspaces, Meter, Notifications.
     readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true]
     readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true]
     readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
-                                       false, true, false, true, false, false, false, false]
+                                       false, true, false, true, false, false, false, false, false, false]
     // Still effects, and live ones that follow their source, have no speed.
     readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
-                                      true, true, true, true, true, false, false, false]
+                                      true, true, true, true, true, false, false, false, false, false]
+    readonly property int meterEffect: 17
     // 0 one color, 1 two colors, 2 random; one color is the same color twice.
     readonly property int colorMode: !current ? -1
         : current.randomColors && usesRandom[current.effect] ? 2
@@ -263,6 +264,16 @@ ScrollView {
                             options: [qsTr("Fast"), qsTr("Normal"), qsTr("Slow")]
                             current: page.current ? page.current.speed : -1
                             onPicked: (i) => backend.setLayerSpeed(page.layerIndex, i)
+                        }
+                    }
+                    ColumnLayout {
+                        visible: page.current !== null && page.current.effect === page.meterEffect
+                        spacing: 8
+                        Label { text: qsTr("Shows") }
+                        Segmented {
+                            options: [qsTr("CPU"), qsTr("Temperature"), qsTr("Battery")]
+                            current: page.current ? page.current.option : -1
+                            onPicked: (i) => backend.setLayerOption(page.layerIndex, i)
                         }
                     }
                     Segmented {

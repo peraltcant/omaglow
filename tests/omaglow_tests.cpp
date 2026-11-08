@@ -466,6 +466,85 @@ private slots:
         QVERIFY(Design::render(lighting, 0, Design::demoLive(0)) != Design::render(lighting, 900, Design::demoLive(900)));
     }
 
+    void systemLayersShowMetersAndNotifications()
+    {
+        QList<int> fRow;
+        for (const auto &k : Keymap::layout())
+            if (QByteArray(k.label).startsWith('F') && QChar(k.label[1]).isDigit())
+                fRow.append(k.code);
+        QCOMPARE(fRow.size(), 12);
+        const int f1 = fRow.first(), f12 = fRow.last();
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        Design::Layer layer;
+        layer.color1 = QColor("#00ff00");
+        layer.color2 = QColor("#ff0000");
+        layer.effect = Design::Meter;
+        layer.keys = fRow;
+        lighting.layers = {layer};
+
+        // CPU at half: the left half of the row lit, colored halfway to the second color.
+        Design::Live live;
+        live.cpu = 0.5;
+        Design::Keys frame = Design::render(lighting, 0, live);
+        QCOMPARE(frame.value(f1), QColor(128, 128, 0));
+        QCOMPARE(frame.value(f12), QColor(0, 0, 0));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsSystem));
+        // Unknown values stay dark.
+        QCOMPARE(Design::render(lighting, 0, {}).value(f1), QColor(0, 0, 0));
+        // Battery: a low one shows few keys, in the second color.
+        lighting.layers[0].option = Design::BatteryMeter;
+        live.battery = 10;
+        frame = Design::render(lighting, 0, live);
+        QCOMPARE(frame.value(f1), QColor(230, 26, 0));
+        QCOMPARE(frame.value(fRow.at(3)), QColor(0, 0, 0));
+        // Temperature from 40 to 95 °C.
+        lighting.layers[0].option = Design::TemperatureMeter;
+        live.temperature = 95;
+        QCOMPARE(Design::render(lighting, 0, live).value(f12), QColor("#ff0000"));
+
+        // A notification blinks the keys for two seconds, then they show
+        // what is under them again.
+        lighting.layers[0].effect = Design::Notifications;
+        lighting.layers[0].option = 0;
+        lighting.keys.insert(f1, QColor("#123456"));
+        live = {};
+        live.notifiedAt = 1000;
+        QCOMPARE(Design::render(lighting, 1000, live).value(f1), QColor("#00ff00"));
+        QCOMPARE(Design::render(lighting, 1300, live).value(f1), QColor(0, 0, 0));
+        QCOMPARE(Design::render(lighting, 4000, live).value(f1), QColor("#123456"));
+        QCOMPARE(Design::render(lighting, 500, {}).value(f1), QColor("#123456"));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsNotifications));
+
+        // The option is stored in the effect field, only when there is one,
+        // so layers saved before read and write back the same.
+        const QString old = "8|1|#ff0000|#0000ff|0|2 3|Wave | name";
+        QCOMPARE(Design::encodeLayers(Design::decodeLayers({old})), QStringList{old});
+        Design::Layer meter = layer;
+        meter.option = Design::BatteryMeter;
+        meter.name = "Battery";
+        const QList<Design::Layer> back = Design::decodeLayers(Design::encodeLayers({meter}));
+        QCOMPARE(back.first().effect, int(Design::Meter));
+        QCOMPARE(back.first().option, int(Design::BatteryMeter));
+        QVERIFY(Design::encodeLayers({meter}).first().startsWith(QString("%1:2|").arg(int(Design::Meter))));
+
+        // Readings from /proc/stat and sysfs.
+        const auto a = LiveFeed::cpuTimes("cpu  100 0 100 800 0 0 0 0 0 0\ncpu0 1 2 3\n");
+        const auto b = LiveFeed::cpuTimes("cpu  200 0 200 1000 0 0 0 0 0 0\n");
+        QCOMPARE(LiveFeed::cpuBusy(a, b), 0.5);
+        QTemporaryDir sys;
+        QVERIFY(QDir(sys.path()).mkpath("class/hwmon/hwmon0") && QDir(sys.path()).mkpath("class/hwmon/hwmon1")
+                && QDir(sys.path()).mkpath("class/power_supply/BAT0"));
+        write(sys.path() + "/class/hwmon/hwmon0/name", "nvme\n");
+        write(sys.path() + "/class/hwmon/hwmon0/temp1_input", "30000\n");
+        write(sys.path() + "/class/hwmon/hwmon1/name", "coretemp\n");
+        write(sys.path() + "/class/hwmon/hwmon1/temp1_input", "55000\n");
+        write(sys.path() + "/class/power_supply/BAT0/capacity", "42\n");
+        QCOMPARE(LiveFeed::readTemperature(sys.path()), 55.0);
+        QCOMPARE(LiveFeed::readBattery(sys.path()), 42.0);
+        QCOMPARE(LiveFeed::readBattery(sys.path() + "/missing"), -1.0);
+    }
+
     void layerEffectsMoveOverTime()
     {
         Design::ProfileLighting lighting;
@@ -1910,6 +1989,23 @@ private slots:
         const QVariantMap layer = backend->layers()[index].toMap();
         // Effects that alternate show only the color picked, not a stray second one.
         QCOMPARE(layer.value("color2").value<QColor>(), layer.value("color1").value<QColor>());
+    }
+
+    void layersKeepTheirOption()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
+        const int index = backend->addLayer("");
+        backend->setLayerEffect(index, Design::Meter);
+        backend->setLayerOption(index, Design::BatteryMeter);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), int(Design::BatteryMeter));
+        // Out of range options are refused, and another effect starts without one.
+        backend->setLayerOption(index, 99);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), int(Design::BatteryMeter));
+        backend->setLayerEffect(index, Design::Fire);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 0);
     }
 
     void lightServicePacesItsReports()

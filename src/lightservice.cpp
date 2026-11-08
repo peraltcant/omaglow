@@ -29,6 +29,7 @@ LightService::LightService(Finder finder, Opener opener, QSettings *settings, QO
     connect(&m_frameTimer, &QTimer::timeout, this, &LightService::sendFrame);
     m_frameTimer.setInterval(Design::FrameMs);
     m_clock.start();
+    m_live.setClock([this] { return m_clock.elapsed(); });
     // The app saves the settings as it edits; pick changes up right away.
     // QSettings replaces the file, so the folder is what is watched.
     m_reload.setSingleShot(true);

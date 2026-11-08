@@ -236,5 +236,10 @@
   "Fireflies": "Luciérnagas",
   "Heartbeat": "Latido",
   "Gradient": "Degradado",
-  "Workspaces": "Espacios de trabajo"
+  "Workspaces": "Espacios de trabajo",
+  "Meter": "Medidor",
+  "Notifications": "Notificaciones",
+  "Shows": "Muestra",
+  "CPU": "CPU",
+  "Temperature": "Temperatura"
 }

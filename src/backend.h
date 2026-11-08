@@ -161,6 +161,8 @@ public:
     Q_INVOKABLE void renameLayer(int index, const QString &name);
     Q_INVOKABLE void setLayerEffect(int index, int effect);
     Q_INVOKABLE void setLayerSpeed(int index, int speed);
+    // What some effects need besides colors: a meter's source (Design::MeterSource).
+    Q_INVOKABLE void setLayerOption(int index, int option);
     // which: 0 for the first color, 1 for the second.
     Q_INVOKABLE void setLayerColor(int index, int which, const QColor &color);
     Q_INVOKABLE void setLayerRandom(int index, bool on);

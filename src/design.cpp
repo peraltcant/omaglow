@@ -222,6 +222,28 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
                                                           : QColor(0, 0, 0);
             break;
         }
+        case Meter: {
+            // A bar from the left, all of it in one color between the first
+            // (fine) and the second (busy, hot, or a battery running out).
+            double value = -1, danger = 0;
+            if (layer.option == TemperatureMeter && live.temperature >= 0)
+                value = danger = qBound(0.0, (live.temperature - 40) / 55, 1.0);
+            else if (layer.option == BatteryMeter && live.battery >= 0)
+                danger = 1 - (value = qBound(0.0, live.battery / 100, 1.0));
+            else if (layer.option == CpuMeter && live.cpu >= 0)
+                value = danger = qBound(0.0, live.cpu, 1.0);
+            c = value > 0 && across(x) <= value + 1e-9 ? mixed(layer.color1, layer.color2, danger) : QColor(0, 0, 0);
+            break;
+        }
+        case Notifications: {
+            // Four blinks over two seconds, the colors taking turns; otherwise
+            // the keys show what is under the layer.
+            const qint64 since = ms - live.notifiedAt;
+            if (live.notifiedAt < 0 || since < 0 || since >= 2000)
+                continue;
+            c = (since / 250) % 2 ? QColor(0, 0, 0) : (since / 500) % 2 ? layer.color2 : layer.color1;
+            break;
+        }
         case Tide:
             c = mixed(layer.color2, layer.color1, 0.5 + 0.5 * std::sin(2 * M_PI * (x / 6.0 - t)));
             break;
@@ -252,6 +274,10 @@ int liveNeeds(const ProfileLighting &lighting) {
             needs |= NeedsMusic;
         else if (layer.effect == Workspaces)
             needs |= NeedsWorkspaces;
+        else if (layer.effect == Meter)
+            needs |= NeedsSystem;
+        else if (layer.effect == Notifications)
+            needs |= NeedsNotifications;
     }
     return needs;
 }
@@ -263,6 +289,10 @@ Live demoLive(qint64 ms) {
         live.spectrum.append(qBound(0, int(255 * (0.55 + 0.45 * std::sin(s * 3 + band * 0.7)) * (1 - band / 40.0)), 255));
     live.busyWorkspaces = {1, 2, 4};
     live.activeWorkspace = 2;
+    live.cpu = 0.45 + 0.3 * std::sin(s / 2);
+    live.temperature = 60 + 15 * std::sin(s / 3);
+    live.battery = 70;
+    live.notifiedAt = ms - ms % 5000; // a notification every five seconds
     return live;
 }
 
@@ -279,7 +309,9 @@ QList<Layer> decodeLayers(const QStringList &entries) {
     QList<Layer> layers;
     for (const QString &entry : entries) {
         Layer layer;
-        layer.effect = qBound(0, entry.section('|', 0, 0).toInt(), LayerEffectCount - 1);
+        const QString effect = entry.section('|', 0, 0);
+        layer.effect = qBound(0, effect.section(':', 0, 0).toInt(), LayerEffectCount - 1);
+        layer.option = qMax(0, effect.section(':', 1, 1).toInt());
         layer.speed = qBound(0, entry.section('|', 1, 1).toInt(), 2);
         if (const QColor c(entry.section('|', 2, 2)); c.isValid())
             layer.color1 = c;
@@ -306,8 +338,10 @@ QStringList encodeLayers(const QList<Layer> &layers) {
         QStringList codes;
         for (int code : layer.keys)
             codes.append(QString::number(code));
+        const QString effect = layer.option ? QString("%1:%2").arg(layer.effect).arg(layer.option)
+                                            : QString::number(layer.effect);
         entries.append(QString("%1|%2|%3|%4|%5|%6|%7")
-                           .arg(layer.effect)
+                           .arg(effect)
                            .arg(layer.speed)
                            .arg(layer.color1.name(), layer.color2.name(), layer.randomColors ? "1" : "0",
                                 codes.join(' '), layer.name));

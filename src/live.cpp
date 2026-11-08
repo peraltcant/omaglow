@@ -1,6 +1,7 @@
 #include "live.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -13,6 +14,12 @@ namespace {
 constexpr int sampleRate = 44100;
 // Workspaces change by hand, so twice a second is quick enough.
 constexpr int workspacePollMs = 500;
+constexpr int systemPollMs = 1000;
+
+QByteArray readFile(const QString &path) {
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? file.readAll().trimmed() : QByteArray();
+}
 }
 
 LiveFeed::LiveFeed(QObject *parent) : QObject(parent) {
@@ -30,6 +37,20 @@ LiveFeed::LiveFeed(QObject *parent) : QObject(parent) {
     });
     m_workspaceTimer.setInterval(workspacePollMs);
     connect(&m_workspaceTimer, &QTimer::timeout, this, &LiveFeed::pollWorkspaces);
+    m_systemTimer.setInterval(systemPollMs);
+    connect(&m_systemTimer, &QTimer::timeout, this, &LiveFeed::pollSystem);
+    // One line per message on the bus that matches; only the header line
+    // (member=Notify) counts, the arguments that follow are skipped.
+    connect(&m_monitor, &QProcess::readyReadStandardOutput, this, [this] {
+        while (m_monitor.canReadLine()) {
+            const QByteArray line = m_monitor.readLine();
+            if (line.startsWith("method call") && line.contains("member=Notify"))
+                m_notifiedAt = m_clockNow ? m_clockNow() : 0;
+        }
+    });
+    connect(&m_monitor, &QProcess::errorOccurred, this, [](QProcess::ProcessError) {
+        qInfo("can't run dbus-monitor; notification layers stay dark");
+    });
 }
 
 LiveFeed::~LiveFeed() {
@@ -55,6 +76,22 @@ void LiveFeed::setNeeds(int needs) {
         m_busy.clear();
         m_active = 0;
     }
+    const bool system = needs & Design::NeedsSystem, notifications = needs & Design::NeedsNotifications;
+    if (system && !m_systemTimer.isActive()) {
+        m_lastCpu = cpuTimes(readFile("/proc/stat"));
+        pollSystem();
+        m_systemTimer.start();
+    } else if (!system && m_systemTimer.isActive()) {
+        m_systemTimer.stop();
+        m_cpu = m_temperature = m_battery = -1;
+    }
+    if (notifications && m_monitor.state() == QProcess::NotRunning) {
+        m_monitor.start("dbus-monitor", {"--session", "type='method_call',interface='org.freedesktop.Notifications',member='Notify'"});
+    } else if (!notifications && m_monitor.state() != QProcess::NotRunning) {
+        m_monitor.kill();
+        m_monitor.waitForFinished(500);
+        m_notifiedAt = -1;
+    }
     m_needs = needs;
 }
 
@@ -67,6 +104,10 @@ Design::Live LiveFeed::snapshot() const {
     }
     live.busyWorkspaces = m_busy;
     live.activeWorkspace = m_active;
+    live.cpu = m_cpu;
+    live.temperature = m_temperature;
+    live.battery = m_battery;
+    live.notifiedAt = m_notifiedAt;
     return live;
 }
 
@@ -117,4 +158,57 @@ QByteArray LiveFeed::askHyprland(const QByteArray &request) const {
 void LiveFeed::pollWorkspaces() {
     m_busy = busyWorkspaces(askHyprland("j/workspaces"));
     m_active = activeWorkspace(askHyprland("j/activeworkspace"));
+}
+
+LiveFeed::CpuTimes LiveFeed::cpuTimes(const QByteArray &stat) {
+    // cpu user nice system idle iowait irq softirq steal ...
+    const QList<QByteArray> fields = stat.left(stat.indexOf('\n')).simplified().split(' ');
+    CpuTimes times;
+    if (fields.size() < 5 || fields.first() != "cpu")
+        return times;
+    for (int i = 1; i < fields.size() && i <= 8; ++i) {
+        const qint64 v = fields.at(i).toLongLong();
+        times.total += v;
+        if (i != 4 && i != 5) // idle and iowait
+            times.busy += v;
+    }
+    return times;
+}
+
+double LiveFeed::cpuBusy(const CpuTimes &before, const CpuTimes &after) {
+    const qint64 total = after.total - before.total;
+    return total > 0 ? qBound(0.0, double(after.busy - before.busy) / total, 1.0) : -1;
+}
+
+double LiveFeed::readTemperature(const QString &sysRoot) {
+    const QDir hwmon(sysRoot + "/class/hwmon");
+    for (const QString &dir : hwmon.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QByteArray name = readFile(hwmon.filePath(dir + "/name"));
+        if (name != "coretemp" && name != "k10temp" && name != "zenpower" && name != "cpu_thermal")
+            continue;
+        bool ok = false;
+        const double milli = readFile(hwmon.filePath(dir + "/temp1_input")).toDouble(&ok);
+        if (ok)
+            return milli / 1000;
+    }
+    return -1;
+}
+
+double LiveFeed::readBattery(const QString &sysRoot) {
+    const QDir supplies(sysRoot + "/class/power_supply");
+    for (const QString &dir : supplies.entryList({"BAT*"}, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        bool ok = false;
+        const double charge = readFile(supplies.filePath(dir + "/capacity")).toDouble(&ok);
+        if (ok)
+            return charge;
+    }
+    return -1;
+}
+
+void LiveFeed::pollSystem() {
+    const CpuTimes now = cpuTimes(readFile("/proc/stat"));
+    m_cpu = cpuBusy(m_lastCpu, now);
+    m_lastCpu = now;
+    m_temperature = readTemperature();
+    m_battery = readBattery();
 }

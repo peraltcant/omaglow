@@ -37,7 +37,7 @@ enum LayerEffect {
     StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current,
     Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
     // Live ones, drawn from what the lights service gathers (Live below).
-    Music, Workspaces,
+    Music, Workspaces, Meter, Notifications,
     LayerEffectCount
 };
 
@@ -47,10 +47,17 @@ struct Live {
     QList<int> spectrum;      // audio bands 0-255, low to high
     QSet<int> busyWorkspaces; // Hyprland workspaces with windows
     int activeWorkspace = 0;
+    double cpu = -1;          // busy share 0-1, -1 unknown
+    double temperature = -1;  // CPU package, °C
+    double battery = -1;      // laptop charge, 0-100
+    qint64 notifiedAt = -1;   // when the last notification came, on the render clock
 };
 
+// What a meter layer shows (its option).
+enum MeterSource { CpuMeter, TemperatureMeter, BatteryMeter, MeterSourceCount };
+
 // Which live inputs a lighting's layers use.
-enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2 };
+enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2, NeedsSystem = 4, NeedsNotifications = 8 };
 
 // A group of keys with one effect. Later layers cover earlier ones.
 struct Layer {
@@ -60,10 +67,12 @@ struct Layer {
     QColor color1 = QColor(255, 255, 255);
     QColor color2 = QColor(0, 0, 255);
     bool randomColors = false;
+    int option = 0;  // what some effects need besides colors: a meter's source
     QList<int> keys; // key codes, in the order they were added
 };
 
-// One layer per entry: "effect|speed|#color1|#color2|random|codes|name".
+// One layer per entry: "effect|speed|#color1|#color2|random|codes|name", the
+// effect written "effect:option" when the layer has an option.
 QList<Layer> decodeLayers(const QStringList &entries);
 QStringList encodeLayers(const QList<Layer> &layers);
 

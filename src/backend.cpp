@@ -434,7 +434,7 @@ QVariantList Backend::layers() const {
             keys.append(code);
         list.append(QVariantMap{{"name", layer.name}, {"effect", layer.effect}, {"speed", layer.speed},
                                 {"color1", layer.color1}, {"color2", layer.color2},
-                                {"randomColors", layer.randomColors}, {"keys", keys}});
+                                {"randomColors", layer.randomColors}, {"option", layer.option}, {"keys", keys}});
     }
     return list;
 }
@@ -447,7 +447,7 @@ QStringList Backend::layerEffects() const {
     return {tr("Static"), tr("Breathing"), tr("Strobing"), tr("Color cycle"),
             tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current"),
             tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient"),
-            tr("Music"), tr("Workspaces")};
+            tr("Music"), tr("Workspaces"), tr("Meter"), tr("Notifications")};
 }
 
 // A layer edit shows the custom lighting; false for an index out of range.
@@ -493,7 +493,20 @@ void Backend::renameLayer(int index, const QString &name) {
 void Backend::setLayerEffect(int index, int effect) {
     if (!editLayer(index))
         return;
-    m_layers[index].effect = qBound(0, effect, Design::LayerEffectCount - 1);
+    effect = qBound(0, effect, Design::LayerEffectCount - 1);
+    if (effect != m_layers[index].effect)
+        m_layers[index].option = 0; // an option only means something to its effect
+    m_layers[index].effect = effect;
+    scheduleLighting();
+}
+
+void Backend::setLayerOption(int index, int option) {
+    if (!editLayer(index))
+        return;
+    const int count = m_layers[index].effect == Design::Meter ? Design::MeterSourceCount : 1;
+    if (option < 0 || option >= count)
+        return;
+    m_layers[index].option = option;
     scheduleLighting();
 }
 
