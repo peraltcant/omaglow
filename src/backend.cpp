@@ -223,11 +223,13 @@ void Backend::refreshBattery() {
         return;
     const DeviceLock lock;
     QByteArray reply = m_link->transact(Protocol::queryBattery());
+    auto *hid = dynamic_cast<HidrawLink *>(m_link.get());
     // A reply can come late while the light stream keeps the keyboard busy,
-    // so one silence on the cable is asked again before calling it stuck.
-    if (reply.isEmpty() && m_node.reportId == 0)
+    // so one silence on the cable is asked again before calling it stuck; a
+    // link that failed (unplugged) isn't asked again.
+    if (reply.isEmpty() && m_node.reportId == 0 && !(hid && hid->failed()))
         reply = m_link->transact(Protocol::queryBattery());
-    if (auto *hid = dynamic_cast<HidrawLink *>(m_link.get()); hid && hid->failed()) {
+    if (hid && hid->failed()) {
         disconnectDevice();
         return;
     }
