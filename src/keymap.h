@@ -19,6 +19,8 @@ const Key *find(int code);
 
 // The key's LED in direct mode (column*8+row on the keyboard's matrix), or -1.
 int ledOf(int code);
+// The key a USB keyboard usage (page 7) reports, -1 for one the Azoth hasn't.
+int codeOfUsage(int usage);
 
 // Every key position, in the order Armoury resets them.
 QList<int> resetCodes();

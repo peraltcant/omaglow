@@ -359,7 +359,7 @@ private slots:
             lighting.layers[0].effect = effect;
             return Design::animated(lighting);
         };
-        const int esc = 0x6e, right = 0x59, space = 0x2c;
+        const int esc = 0x6e, right = 0x59, space = 0x3d;
 
         // Fire rises from the space bar: the bottom burns brighter than the
         // top row over a cycle, and the flames flicker.
@@ -587,6 +587,71 @@ private slots:
         lighting.layers[0].option = 0;
         QCOMPARE(at(start, start + 20 * minute).value(first), QColor("#00ff00"));
         QCOMPARE(at(start, start + 24 * minute).value(last), QColor(0, 0, 0));
+    }
+
+    void typingLayersRippleFromPressedKeys()
+    {
+        const int g = 0x23, h = 0x24, p = 0x1a, esc = 0x6e;
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        Design::Layer layer;
+        layer.color1 = QColor("#ffffff");
+        layer.color2 = QColor("#ffffff");
+        layer.effect = Design::Typing;
+        layer.speed = 1; // a ripple lasts 1.5 s
+        for (const auto &k : Keymap::layout())
+            layer.keys.append(k.code);
+        lighting.layers = {layer};
+        Design::Live live;
+        live.pressedAt.insert(g, 1000);
+
+        // The pressed key lights at once, the ring reaches its neighbor a
+        // moment later, a far key stays dark, and it all fades out.
+        QCOMPARE(Design::render(lighting, 1000, live).value(g), QColor("#ffffff"));
+        QCOMPARE(Design::render(lighting, 1000, live).value(esc), QColor(0, 0, 0));
+        QVERIFY(Design::render(lighting, 1250, live).value(h).value() > 0);
+        QCOMPARE(Design::render(lighting, 1000, live).value(p), QColor(0, 0, 0));
+        QCOMPARE(Design::render(lighting, 2600, live).value(g), QColor(0, 0, 0));
+        QCOMPARE(Design::render(lighting, 1000, {}).value(g), QColor(0, 0, 0));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsTyping));
+
+        // Key reports to Azoth keys: USB usages to the keyboard's own codes,
+        // left and right modifiers apart.
+        QCOMPARE(Keymap::codeOfUsage(0x04), 0x1f); // A
+        QCOMPARE(Keymap::codeOfUsage(0x1e), 0x02); // 1
+        QCOMPARE(Keymap::codeOfUsage(0x2c), 0x3d); // space
+        QCOMPARE(Keymap::codeOfUsage(0x29), 0x6e); // Esc
+        QCOMPARE(Keymap::codeOfUsage(0x3a), 0x70); // F1
+        QCOMPARE(Keymap::codeOfUsage(0xe1), 0x2c); // left Shift
+        QCOMPARE(Keymap::codeOfUsage(0xe5), 0x39); // right Shift
+        QCOMPARE(Keymap::codeOfUsage(0x50), 0x4f); // left arrow
+        QCOMPARE(Keymap::codeOfUsage(0x99), -1);
+        int mapped = 0;
+        for (int usage = 0; usage < 256; ++usage)
+            mapped += Keymap::codeOfUsage(usage) >= 0;
+        QCOMPARE(mapped, int(Keymap::layout().size()) - 1); // all but Fn, which never reports
+
+        // Boot reports (modifiers, reserved, six keys) and NKRO bitmaps.
+        QCOMPARE(LiveFeed::pressedUsages(QByteArray::fromHex("0200040000000000")), QSet<int>({0xe1, 0x04}));
+        QByteArray bitmap(15, 0);
+        bitmap[0x04 / 8] = char(1 << (0x04 % 8));
+        bitmap[0x2c / 8] = char(bitmap[0x2c / 8] | 1 << (0x2c % 8));
+        QCOMPARE(LiveFeed::pressedUsages(bitmap), QSet<int>({0x04, 0x2c}));
+        QCOMPARE(LiveFeed::pressedUsages(QByteArray::fromHex("0000010000000000")), QSet<int>()); // rollover error
+
+        // The keyboard's key interfaces: keyboard collections without report ids.
+        QTemporaryDir sys;
+        auto node = [&](const QString &name, const QByteArray &id, const QByteArray &descriptor) {
+            QVERIFY(QDir(sys.path()).mkpath("class/hidraw/" + name + "/device"));
+            write(sys.path() + "/class/hidraw/" + name + "/device/uevent", "HID_ID=0003:00000B05:" + id + "\n");
+            write(sys.path() + "/class/hidraw/" + name + "/device/report_descriptor", descriptor);
+        };
+        node("hidraw5", "00001A83", QByteArray::fromHex("05010906a101050815002501"));
+        node("hidraw7", "00001A83", QByteArray::fromHex("0600ff0901a101"));
+        node("hidraw8", "00001A83", QByteArray::fromHex("05010906a1018501"));
+        node("hidraw9", "00001A83", QByteArray::fromHex("05010906a10175019578"));
+        node("hidraw3", "0000C52B", QByteArray::fromHex("05010906a101"));
+        QCOMPARE(LiveFeed::keyboardInputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw5", "/dev/hidraw9"}));
     }
 
     void layerEffectsMoveOverTime()

@@ -253,6 +253,29 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             }
             break;
         }
+        case Typing: {
+            // A ring from each pressed key, as wide as six keys at the end of
+            // half a cycle, fading as it goes; the brightest one wins.
+            const double life = period / 2.0, y = Keymap::find(code)->y;
+            double best = 0;
+            QColor color = layer.color1;
+            for (auto it = live.pressedAt.begin(); it != live.pressedAt.end(); ++it) {
+                const Keymap::Key *pressed = Keymap::find(it.key());
+                const double age = ms - it.value();
+                if (!pressed || age < 0 || age >= life)
+                    continue;
+                const double distance = std::hypot(x - centerOf(it.key()), y - pressed->y);
+                const double ring = 1 - std::abs(distance - age / life * 6) / 1.2;
+                const double glow = (1 - age / life) * qMax(0.0, distance < 0.5 ? qMax(ring, 1.0 - age / life) : ring);
+                if (glow > best) {
+                    best = glow;
+                    color = layer.randomColors ? hue(hashOf(it.key(), it.value()) % 360)
+                                               : mixed(layer.color1, layer.color2, qMin(1.0, distance / 6));
+                }
+            }
+            c = scaled(color, best);
+            break;
+        }
         case Notifications: {
             // Four blinks over two seconds, the colors taking turns; otherwise
             // the keys show what is under the layer.
@@ -298,6 +321,8 @@ int liveNeeds(const ProfileLighting &lighting) {
             needs |= NeedsNotifications;
         else if (layer.effect == Timer)
             needs |= NeedsTimer;
+        else if (layer.effect == Typing)
+            needs |= NeedsTyping;
     }
     return needs;
 }

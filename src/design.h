@@ -37,7 +37,7 @@ enum LayerEffect {
     StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current,
     Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
     // Live ones, drawn from what the lights service gathers (Live below).
-    Music, Workspaces, Meter, Notifications, Timer,
+    Music, Workspaces, Meter, Notifications, Timer, Typing,
     LayerEffectCount
 };
 
@@ -53,6 +53,7 @@ struct Live {
     qint64 notifiedAt = -1;   // when the last notification came, on the render clock
     qint64 timerStartedAt = 0; // wall clock ms since the epoch, 0 when stopped
     qint64 now = 0;            // wall clock ms since the epoch
+    QHash<int, qint64> pressedAt; // key code to when it was last pressed, on the render clock
 };
 
 // A timer layer's minutes when its option is 0.
@@ -64,7 +65,7 @@ constexpr qint64 TimerDoneMs = 60000;
 enum MeterSource { CpuMeter, TemperatureMeter, BatteryMeter, MeterSourceCount };
 
 // Which live inputs a lighting's layers use.
-enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2, NeedsSystem = 4, NeedsNotifications = 8, NeedsTimer = 16 };
+enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2, NeedsSystem = 4, NeedsNotifications = 8, NeedsTimer = 16, NeedsTyping = 32 };
 
 // A group of keys with one effect. Later layers cover earlier ones.
 struct Layer {

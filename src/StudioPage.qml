@@ -16,18 +16,19 @@ ScrollView {
     // Effects that use the colors, and the ones where random colors make sense.
     // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
     // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
-    // then the live ones: Music, Workspaces, Meter, Notifications, Timer.
+    // then the live ones: Music, Workspaces, Meter, Notifications, Timer, Typing.
     readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true, true]
     readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true, true]
     readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
-                                       false, true, false, true, false, false, false, false, false, false, false]
+                                       false, true, false, true, false, false, false, false, false, false, false, true]
     // Still effects, and live ones that follow their source, have no speed.
     readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
-                                      true, true, true, true, true, false, false, false, false, false, false]
+                                      true, true, true, true, true, false, false, false, false, false, false, true]
     readonly property int meterEffect: 17
     readonly property int timerEffect: 19
+    readonly property int typingEffect: 20
     readonly property var timerMinutes: [5, 15, 25, 45, 60]
     // 0 one color, 1 two colors, 2 random; one color is the same color twice.
     readonly property int colorMode: !current ? -1
@@ -277,6 +278,13 @@ ScrollView {
                             current: page.current ? page.current.option : -1
                             onPicked: (i) => backend.setLayerOption(page.layerIndex, i)
                         }
+                    }
+                    Label {
+                        visible: page.current !== null && page.current.effect === page.typingEffect
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                        text: qsTr("Omaglow reads which keys you press to light them, only while this layer shows. Nothing is stored or sent.")
                     }
                     ColumnLayout {
                         visible: page.current !== null && page.current.effect === page.timerEffect

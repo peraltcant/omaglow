@@ -447,7 +447,7 @@ QStringList Backend::layerEffects() const {
     return {tr("Static"), tr("Breathing"), tr("Strobing"), tr("Color cycle"),
             tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current"),
             tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient"),
-            tr("Music"), tr("Workspaces"), tr("Meter"), tr("Notifications"), tr("Timer")};
+            tr("Music"), tr("Workspaces"), tr("Meter"), tr("Notifications"), tr("Timer"), tr("Typing")};
 }
 
 // A layer edit shows the custom lighting; false for an index out of range.

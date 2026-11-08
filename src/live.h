@@ -5,6 +5,9 @@
 #include <QObject>
 #include <QProcess>
 #include <QSet>
+#include <QSocketNotifier>
+#include <memory>
+#include <vector>
 #include <QTimer>
 #include <functional>
 
@@ -13,9 +16,11 @@
 // Gathers what the live layers show, inside `omaglow lights`: the default
 // output's audio through parec (as the music display does), Hyprland's
 // workspaces through its IPC socket, CPU load, temperature and battery from
-// /proc and sysfs, and notifications through dbus-monitor (only that one
-// came; what it says is read past, never kept). Each source runs only while
-// a shown layer needs it.
+// /proc and sysfs, notifications through dbus-monitor (only that one came;
+// what it says is read past, never kept), and which keys are pressed from
+// the keyboard's own key interfaces (kept a few seconds in memory to draw the
+// ripples, never stored or logged). Each source runs only while a shown
+// layer needs it.
 class LiveFeed : public QObject {
     Q_OBJECT
 
@@ -47,9 +52,19 @@ public:
     static double readTemperature(const QString &sysRoot = "/sys");
     static double readBattery(const QString &sysRoot = "/sys");
 
+    // The usages held down in a key report: an 8-byte boot report
+    // (modifiers, reserved, six keys) or a bitmap with one bit per usage.
+    static QSet<int> pressedUsages(const QByteArray &report);
+    // The Azoth's key interfaces (keyboard collections without report ids),
+    // as /dev paths.
+    static QStringList keyboardInputNodes(const QString &sysRoot = "/sys", const QString &devRoot = "/dev");
+
 private:
     void pollWorkspaces();
     void pollSystem();
+    void openKeyInputs();
+    void closeKeyInputs();
+    void readKeys(int fd);
     QByteArray askHyprland(const QByteArray &request) const;
 
     int m_needs = 0;
@@ -66,4 +81,12 @@ private:
     QByteArray m_monitorLine;
     qint64 m_notifiedAt = -1;
     std::function<qint64()> m_clockNow;
+    struct KeyInput {
+        int fd;
+        std::unique_ptr<QSocketNotifier> notifier;
+        QSet<int> held;
+    };
+    std::vector<KeyInput> m_keyInputs;
+    QTimer m_keyInputRetry; // the keyboard may come and go
+    QHash<int, qint64> m_pressedAt;
 };
