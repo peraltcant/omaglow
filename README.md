@@ -42,8 +42,22 @@ stored on the keyboard and survive reboots and other computers.
   again after a profile switch or reconnect).
 - Layers in Studio, as in Aura Creator: groups of keys with their own effect
   (Static, Breathing, Strobing, Color cycle, Rainbow, Starry night, Comet,
-  Tide, Current) in one color, two colors or random colors, drawn over the
-  design, layers to the right on top. Moving layers are streamed with 20 ms
+  Tide, Current, and Omaglow's Fire, Plasma, Scanner, Fireflies, Heartbeat
+  and Gradient) in one color, two colors or random colors, drawn over the
+  design, layers to the right on top.
+- Live layers that show what is going on:
+  - Music: spectrum bars from the default audio output (`parec`).
+  - Workspaces: on the number keys, Hyprland workspaces with windows in one
+    color and the active one in another.
+  - Meter: CPU load, CPU temperature or the laptop's battery as a bar.
+  - Notifications: the keys blink when a notification comes (`dbus-monitor`;
+    only that one came is used).
+  - Timer: the keys go dark one by one over 5–60 minutes, then blink; started
+    and stopped from Studio.
+  - Typing: ripples from the keys you press, read from the keyboard's own key
+    interface; kept a few seconds in memory, never stored or sent.
+
+  Each source runs only while a layer that needs it is shown. Moving layers are streamed with 20 ms
   between reports by a user service (`omaglow-lights.service`, running
   `omaglow lights`) that the app starts while they are shown; on
   battery this keeps the keyboard's radio busy, and the stream pauses while
