@@ -445,7 +445,8 @@ bool Backend::animatedLighting() const {
 
 QStringList Backend::layerEffects() const {
     return {tr("Static"), tr("Breathing"), tr("Strobing"), tr("Color cycle"),
-            tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current")};
+            tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current"),
+            tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient")};
 }
 
 // A layer edit shows the custom lighting; false for an index out of range.

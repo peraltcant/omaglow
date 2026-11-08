@@ -14,9 +14,17 @@ ScrollView {
     property bool takeOut: false
     readonly property var current: layerIndex >= 0 && layerIndex < backend.layers.length ? backend.layers[layerIndex] : null
     // Effects that use the colors, and the ones where random colors make sense.
-    readonly property var usesColors: [true, true, true, false, false, true, true, true, true]
-    readonly property var usesSecond: [false, true, true, false, false, true, true, true, true]
-    readonly property var usesRandom: [false, true, true, false, false, true, true, false, true]
+    // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
+    // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient.
+    readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
+                                       true, true, true, true, true, true]
+    readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
+                                       true, true, true, true, true, true]
+    readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
+                                       false, true, false, true, false, false]
+    // Still effects have no speed.
+    readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
+                                      true, true, true, true, true, false]
     // 0 one color, 1 two colors, 2 random; one color is the same color twice.
     readonly property int colorMode: !current ? -1
         : current.randomColors && usesRandom[current.effect] ? 2
@@ -247,7 +255,7 @@ ScrollView {
                         onPicked: (i) => backend.setLayerEffect(page.layerIndex, i)
                     }
                     ColumnLayout {
-                        visible: page.current !== null && page.current.effect !== 0
+                        visible: page.current !== null && page.usesSpeed[page.current.effect]
                         spacing: 8
                         Label { text: qsTr("Speed") }
                         Segmented {

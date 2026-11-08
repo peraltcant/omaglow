@@ -59,6 +59,21 @@ QColor pick(const Layer &layer, int salt, qint64 n) {
     return n % 2 ? layer.color2 : layer.color1;
 }
 
+// Smooth noise along t for one seed, 0-1: random values at whole steps,
+// eased in between, so flames flicker without jumping.
+double noise(int seed, double t) {
+    const qint64 step = qint64(std::floor(t));
+    const double a = (hashOf(seed, step) % 1000) / 999.0;
+    const double b = (hashOf(seed, step + 1) % 1000) / 999.0;
+    const double f = t - step;
+    return a + (b - a) * f * f * (3 - 2 * f);
+}
+
+// One bump of a pulse that starts at start and lasts width, 0-1, else 0.
+double pulse(double t, double start, double width) {
+    return t >= start && t < start + width ? std::sin(M_PI * (t - start) / width) : 0;
+}
+
 double centerOf(int code) {
     const Keymap::Key *key = Keymap::find(code);
     return key ? key->x + key->width / 2 : 0;
@@ -81,11 +96,19 @@ void drawLayer(const Layer &layer, qint64 ms, Keys &out) {
             return int(ka->y) % 2 ? ka->x > kb->x : ka->x < kb->x;
         });
     }
-    double minX = 1e9, maxX = -1e9;
+    double minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
     for (int code : layer.keys) {
         minX = qMin(minX, centerOf(code));
         maxX = qMax(maxX, centerOf(code));
+        const double y = Keymap::find(code)->y;
+        minY = qMin(minY, y);
+        maxY = qMax(maxY, y);
     }
+    // Where a key sits in the layer, 0-1 from left to right and bottom to top.
+    auto across = [&](double x) { return maxX > minX ? (x - minX) / (maxX - minX) : 0.0; };
+    auto up = [&](int code) { return maxY > minY ? (maxY - Keymap::find(code)->y) / (maxY - minY) : 0.0; };
+    // Time in cycles, for the effects that move smoothly instead of looping.
+    const double cycles = double(ms) / period;
     for (int code : layer.keys) {
         const double x = centerOf(code);
         QColor c;
@@ -130,6 +153,49 @@ void drawLayer(const Layer &layer, qint64 ms, Keys &out) {
                                                      : QColor(0, 0, 0);
             break;
         }
+        case Fire: {
+            // Heat falls off toward the top; each column flickers on its own.
+            const double flicker = noise(int(std::floor(x)), cycles * 4) - 0.5;
+            const double heat = qBound(0.0, 1.0 - up(code) * 1.15 + flicker * 0.7, 1.0);
+            c = scaled(mixed(layer.color1, layer.color2, heat), qMin(1.0, heat * 1.6));
+            break;
+        }
+        case Plasma: {
+            const double y = Keymap::find(code)->y, p = 2 * M_PI * cycles / 2;
+            const double v = std::sin(x / 4.0 + p) + std::sin(y / 1.6 - p * 0.7) + std::sin((x + y * 2) / 5.0 + p * 1.3);
+            const double f = (v + 3) / 6;
+            c = layer.randomColors ? hue(f * 360 + cycles * 60)
+                                   : mixed(layer.color1, layer.color2, 0.5 - 0.5 * std::cos(2 * M_PI * f));
+            break;
+        }
+        case Scanner: {
+            // Left to right and back once per cycle, with a short fading tail.
+            const double head = minX + (maxX - minX) * (t < 0.5 ? t * 2 : 2 - t * 2);
+            const double d = std::abs(x - head);
+            c = d < 1.5 ? scaled(pick(layer, 0, n), 1 - d / 1.5) : QColor(0, 0, 0);
+            break;
+        }
+        case Fireflies: {
+            // Slow glows, each key on its own longer clock, a third of them at a time.
+            const quint32 h = hashOf(code, 1);
+            const qint64 own = period * (200 + h % 200) / 100;
+            const qint64 local = ms + h % own;
+            const qint64 cycle = local / own;
+            const double phase = double(local % own) / own;
+            const bool glows = hashOf(code, cycle) % 3 == 0 && phase < 0.6;
+            const double s = std::sin(M_PI * phase / 0.6);
+            c = glows ? scaled(pick(layer, code, cycle), s * s) : QColor(0, 0, 0);
+            break;
+        }
+        case Heartbeat: {
+            // Lub-dub: a full beat, a softer one, then a dim rest.
+            const double beat = qMax(pulse(t, 0.0, 0.12), 0.6 * pulse(t, 0.2, 0.12));
+            c = scaled(pick(layer, 0, n), qMax(0.08, beat));
+            break;
+        }
+        case Gradient:
+            c = mixed(layer.color1, layer.color2, across(x));
+            break;
         case Tide:
             c = mixed(layer.color2, layer.color1, 0.5 + 0.5 * std::sin(2 * M_PI * (x / 6.0 - t)));
             break;
@@ -153,7 +219,7 @@ bool animated(const ProfileLighting &lighting) {
     if (!lighting.on || !lighting.custom)
         return false;
     for (const Layer &layer : lighting.layers)
-        if (layer.effect != StaticLayer && !layer.keys.isEmpty())
+        if (layer.effect != StaticLayer && layer.effect != Gradient && !layer.keys.isEmpty())
             return true;
     return false;
 }

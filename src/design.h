@@ -31,7 +31,12 @@ QList<QByteArray> packets(const Keys &keys, int brightness);
 
 // What a layer does to its keys, the effects Aura Creator offers. The host
 // draws them and streams the frames in direct mode.
-enum LayerEffect { StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current, LayerEffectCount };
+// Fire to Gradient are Omaglow's own; a gradient stays still, so it isn't streamed.
+enum LayerEffect {
+    StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current,
+    Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
+    LayerEffectCount
+};
 
 // A group of keys with one effect. Later layers cover earlier ones.
 struct Layer {

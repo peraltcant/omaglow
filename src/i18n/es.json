@@ -229,5 +229,11 @@
   "Left click": "Clic izquierdo",
   "Right click": "Clic derecho",
   "Copilot": "Copilot",
-  "Can't read %1: %2": "No se puede leer %1: %2"
+  "Can't read %1: %2": "No se puede leer %1: %2",
+  "Fire": "Fuego",
+  "Plasma": "Plasma",
+  "Scanner": "Escáner",
+  "Fireflies": "Luciérnagas",
+  "Heartbeat": "Latido",
+  "Gradient": "Degradado"
 }

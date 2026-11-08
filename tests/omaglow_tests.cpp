@@ -338,6 +338,80 @@ private slots:
         QVERIFY(!Design::animated(lighting));
     }
 
+    void newLayerEffectsDrawTheirShapes()
+    {
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        Design::Layer layer;
+        layer.color1 = QColor("#ff0000");
+        layer.color2 = QColor("#ffff00");
+        layer.speed = 1; // a 3 second cycle
+        for (const auto &k : Keymap::layout())
+            layer.keys.append(k.code);
+        lighting.layers = {layer};
+        auto at = [&](int effect, qint64 ms) {
+            lighting.layers[0].effect = effect;
+            return Design::render(lighting, ms);
+        };
+        auto animatedAs = [&](int effect) {
+            lighting.layers[0].effect = effect;
+            return Design::animated(lighting);
+        };
+        const int esc = 0x6e, right = 0x59, space = 0x2c;
+
+        // Fire rises from the space bar: the bottom burns brighter than the
+        // top row over a cycle, and the flames flicker.
+        int bottom = 0, top = 0;
+        for (qint64 ms = 0; ms < 3000; ms += 100) {
+            bottom += at(Design::Fire, ms).value(space).value();
+            top += at(Design::Fire, ms).value(esc).value();
+        }
+        QVERIFY(bottom > top * 2);
+        QVERIFY(at(Design::Fire, 0) != at(Design::Fire, 400));
+
+        // Plasma blends the colors across the keys and keeps moving.
+        QVERIFY(at(Design::Plasma, 0).value(esc) != at(Design::Plasma, 0).value(right));
+        QVERIFY(at(Design::Plasma, 0) != at(Design::Plasma, 1000));
+
+        // The scanner is a narrow bar going back and forth: Esc and the right
+        // arrow are never lit together, and each is lit at some point.
+        bool escLit = false, rightLit = false;
+        for (qint64 ms = 0; ms < 3000; ms += 50) {
+            const Design::Keys frame = at(Design::Scanner, ms);
+            const bool e = frame.value(esc).value() > 0, r = frame.value(right).value() > 0;
+            QVERIFY(!(e && r));
+            escLit |= e;
+            rightLit |= r;
+        }
+        QVERIFY(escLit && rightLit);
+
+        // Fireflies glow here and there, the same at the same moment.
+        int lit = 0, dark = 0;
+        for (const QColor &c : at(Design::Fireflies, 5000))
+            (c.value() > 0 ? lit : dark)++;
+        QVERIFY(lit > 0 && dark > lit);
+        QCOMPARE(at(Design::Fireflies, 5000), at(Design::Fireflies, 5000));
+
+        // A heartbeat: a full beat, a softer second one, then a dim rest.
+        const int first = at(Design::Heartbeat, 3000 * 6 / 100).value(esc).value();
+        const int second = at(Design::Heartbeat, 3000 * 26 / 100).value(esc).value();
+        const int rest = at(Design::Heartbeat, 3000 * 70 / 100).value(esc).value();
+        QCOMPARE(first, 255);
+        QVERIFY(second < first && second > rest);
+        QVERIFY(rest < 40);
+
+        // The gradient goes from the first color on the left to the second on
+        // the right, and stays still, so it isn't streamed.
+        QCOMPARE(at(Design::Gradient, 0).value(esc), QColor("#ff0000"));
+        QCOMPARE(at(Design::Gradient, 0).value(right), QColor("#ffff00"));
+        QCOMPARE(at(Design::Gradient, 0), at(Design::Gradient, 2000));
+        QVERIFY(!animatedAs(Design::Gradient));
+        QVERIFY(animatedAs(Design::Fire));
+
+        // Every effect has a name for Studio.
+        QCOMPARE(int(Design::LayerEffectCount), 15);
+    }
+
     void layerEffectsMoveOverTime()
     {
         Design::ProfileLighting lighting;
