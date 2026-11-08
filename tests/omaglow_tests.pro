@@ -4,6 +4,7 @@ TARGET = omaglow_tests
 TEMPLATE = app
 
 INCLUDEPATH += ../src
+DEFINES += OMAGLOW_SOURCE_DIR=\\\"$$PWD/../src\\\"
 
 HEADERS += ../src/backend.h ../src/device.h ../src/spectrum.h ../src/musicservice.h ../src/clockservice.h ../src/design.h ../src/lightservice.h ../src/keymap.h ../src/filepicker.h ../src/oledimage.h \
            ../src/portalfilepicker.h ../src/protocol.h ../src/theme.h ../src/translator.h ../src/razer.h ../src/laptop.h ../src/appinfo.h

@@ -66,7 +66,7 @@ stored on the keyboard and survive reboots and other computers.
 - Set how long the keyboard waits before sleeping, the battery level for
   the lighting alert, power saving, and the key debounce time.
 - Works over the USB cable and the ROG Omni receiver; follows the Omarchy theme
-  and language.
+  and language (English and Spanish).
 
 ## Install
 

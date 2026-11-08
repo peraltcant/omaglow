@@ -1,4 +1,8 @@
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRegularExpression>
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -2024,6 +2028,60 @@ private slots:
         QCOMPARE(translator.translate("Main", "Save"), QString("Salvar"));
         QCOMPARE(translator.translate("Main", "Open"), QString("Abrir"));
         QVERIFY(translator.translate("Main", "Quit").isNull());
+    }
+
+    // Every string the app shows has a Spanish translation, so a new one
+    // can't ship in English by mistake.
+    void spanishCatalogCoversEveryString()
+    {
+        QFile catalogFile(QStringLiteral(OMAGLOW_SOURCE_DIR "/i18n/es.json"));
+        QVERIFY(catalogFile.open(QIODevice::ReadOnly));
+        const QJsonObject catalog = QJsonDocument::fromJson(catalogFile.readAll()).object();
+        QVERIFY(!catalog.isEmpty());
+
+        QStringList sources;
+        static const QRegularExpression calls(
+            "(?:\\bqsTr|(?<![A-Za-z_])tr|QT_TR_NOOP)\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"|"
+            "(?:QT_TRANSLATE_NOOP|translate)\\(\\s*\"[^\"]*\"\\s*,\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+        const QDir dir(QStringLiteral(OMAGLOW_SOURCE_DIR));
+        for (const QString &name : dir.entryList({"*.qml", "*.cpp"}, QDir::Files)) {
+            if (name == "translator.cpp")
+                continue;
+            QFile file(dir.filePath(name));
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            const QString text = QString::fromUtf8(file.readAll());
+            for (auto it = calls.globalMatch(text); it.hasNext();) {
+                const auto m = it.next();
+                const QString literal = m.captured(1).isNull() ? m.captured(2) : m.captured(1);
+                // Back to the runtime text: the catalog keys are unescaped.
+                sources << QJsonDocument::fromJson(("[\"" + literal + "\"]").toUtf8()).array().at(0).toString();
+            }
+        }
+        // Names kept in tables and translated where they are shown.
+        for (int e = 0; e < Protocol::EffectCount; ++e)
+            sources << QString::fromUtf8(Protocol::effectInfo(e).name);
+        for (const Keymap::Choice &c : Keymap::specialChoices())
+            sources << QString::fromUtf8(c.label);
+
+        QVERIFY(sources.size() > 150);
+        QStringList missing;
+        for (const QString &s : std::as_const(sources))
+            if (!s.isEmpty() && !catalog.contains(s))
+                missing << s;
+        missing.removeDuplicates();
+        QVERIFY2(missing.isEmpty(), qPrintable("Not in es.json: " + missing.join(" | ")));
+    }
+
+    void spanishFollowsOmarchysMexicanSpanish()
+    {
+        QTemporaryDir dir;
+        write(dir.path() + "/language", "es-MX\n");
+        Translator translator(dir.path() + "/language", QStringLiteral(OMAGLOW_SOURCE_DIR "/i18n"));
+        QCOMPARE(translator.language(), QString("es-MX"));
+        QCOMPARE(translator.translate("Main", "Lighting"), QString("Iluminación"));
+        QCOMPARE(translator.translate("Main", "%n keys changed", nullptr, 1), QString("%n tecla cambiada"));
+        QCOMPARE(translator.translate("Main", "%n keys changed", nullptr, 3), QString("%n teclas cambiadas"));
+        QCOMPARE(translator.translate("Main", "%n keys changed", nullptr, 1000000), QString("%n teclas cambiadas"));
     }
 
     void translatorPicksPluralForms()
