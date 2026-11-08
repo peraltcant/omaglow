@@ -37,6 +37,8 @@ public:
     bool reject = false;
     bool asleep = false; // behind the receiver, only the receiver answers
     bool mute = false;   // plugged in but not answering at all
+    int timeoutMs = 400; // what the backend last set
+    void setTimeoutMs(int ms) override { timeoutMs = ms; }
     bool checkLock = false; // count reports sent without holding the keyboard lock
     QList<qint64> *times = nullptr; // when each report went out, in ms
     int *unlocked = nullptr;
@@ -1674,19 +1676,48 @@ private slots:
     {
         QTemporaryDir dir;
         bool mute = true;
+        int opened = 0;
+        FakeLink *last = nullptr;
         auto *settings = new QSettings(dir.path() + "/settings.ini", QSettings::IniFormat);
         auto backend = std::make_unique<Backend>(
             [] { return DeviceNode{DeviceNode::Found, "/dev/null", "1A83"}; },
-            [&](const QString &) -> Link * { auto *l = new FakeLink; l->mute = mute; return l; },
+            [&](const QString &) -> Link * { ++opened; last = new FakeLink; last->mute = mute; return last; },
             settings, nullptr);
         settings->setParent(backend.get());
         // On the cable the keyboard always answers; silence means it is stuck.
         QCOMPARE(backend->connection(), int(Backend::NotResponding));
+        QCOMPARE(opened, 1);
 
-        // Unplugged and plugged back in: found again on the next check.
+        // Every check would freeze the window while it waits, so a stuck keyboard
+        // is asked once, briefly, every third check (6 s).
+        backend->poll();
+        backend->poll();
+        QCOMPARE(opened, 1);
+        backend->poll();
+        QCOMPARE(opened, 2);
+        QCOMPARE(last->sent.size(), 1);
+        QCOMPARE(last->timeoutMs, 150);
+
+        // Unplugged and plugged back in: found again, waiting as long as usual.
         mute = false;
-        QTRY_COMPARE_WITH_TIMEOUT(backend->connection(), int(Backend::Connected), 5000);
+        for (int i = 0; i < 3; ++i)
+            backend->poll();
+        QCOMPARE(backend->connection(), int(Backend::Connected));
         QVERIFY(!backend->firmware().isEmpty());
+        QCOMPARE(last->timeoutMs, 400);
+    }
+
+    void keyboardThatStopsAnsweringIsNoticed()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        QCOMPARE(backend->connection(), int(Backend::Connected));
+        // Writes still go through but nothing comes back: by the next battery check.
+        link->mute = true;
+        for (int i = 0; i < 15; ++i)
+            backend->poll();
+        QCOMPARE(backend->connection(), int(Backend::NotResponding));
     }
 
     void looksShowWhichOneIsOn()

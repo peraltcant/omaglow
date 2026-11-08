@@ -22,6 +22,11 @@
 namespace {
 constexpr int pollIntervalMs = 2000;
 constexpr int batteryEveryPolls = 15; // every 30 seconds
+// A stuck keyboard is asked again this seldom, and only briefly, since the
+// window waits for the answer.
+constexpr int stuckEveryPolls = 3; // every 6 seconds
+constexpr int stuckTimeoutMs = 150;
+constexpr int replyTimeoutMs = 400;
 }
 
 Backend::Backend(QObject *parent)
@@ -76,25 +81,7 @@ Backend::Backend(Finder finder, Opener opener, QSettings *settings, FilePicker *
     // The keyboard comes and goes (cable, dongle, a VM grabbing it), so keep
     // looking for it and notice when it disappears.
     m_pollTimer.setInterval(pollIntervalMs);
-    connect(&m_pollTimer, &QTimer::timeout, this, [this] {
-        refreshMouse();
-        if (m_busy)
-            return;
-        if (m_connection == Connected) {
-            if (!QFileInfo::exists(m_node.path) || !m_link) {
-                disconnectDevice();
-                return;
-            }
-            if (m_asleep) {
-                checkWake();
-                return;
-            }
-            if (++m_pollTicks % batteryEveryPolls == 0)
-                refreshBattery();
-        } else {
-            connectDevice();
-        }
-    });
+    connect(&m_pollTimer, &QTimer::timeout, this, &Backend::poll);
     connect(&m_upload, &QFutureWatcher<bool>::finished, this, [this] {
         m_busy = false;
         m_progress = m_upload.result() ? 1.0 : 0.0;
@@ -141,6 +128,40 @@ int Backend::direction() const {
     return info.directions.contains(m_lighting.direction) ? m_lighting.direction : info.defaultDirection;
 }
 
+void Backend::poll() {
+    refreshMouse();
+    if (m_busy)
+        return;
+    if (m_connection == Connected) {
+        if (!QFileInfo::exists(m_node.path) || !m_link) {
+            disconnectDevice();
+            return;
+        }
+        if (m_asleep) {
+            checkWake();
+            return;
+        }
+        if (++m_pollTicks % batteryEveryPolls == 0)
+            refreshBattery();
+    } else if (m_connection == NotResponding) {
+        if (++m_stuckPolls % stuckEveryPolls == 0)
+            connectDevice();
+    } else {
+        connectDevice();
+    }
+}
+
+void Backend::markNotResponding() {
+    m_link.reset();
+    m_firmware.clear();
+    m_battery = -1;
+    m_stuckPolls = 0;
+    if (m_connection != NotResponding) {
+        m_connection = NotResponding;
+        emit connectionChanged();
+    }
+}
+
 void Backend::connectDevice() {
     const DeviceNode node = m_finder();
     if (node.status == DeviceNode::Found) {
@@ -154,18 +175,17 @@ void Backend::connectDevice() {
         m_link.reset(link);
         m_node = node;
         const DeviceLock lock;
-        // A reply can be lost to the light stream reading the same device, so ask twice.
-        for (int i = 0; i < 2 && m_firmware.isEmpty(); ++i)
-            m_firmware = Protocol::versionFromReply(m_link->transact(Protocol::queryVersion()), m_node.reportId > 0);
+        // Each process reading the node gets its own copy of every reply, so
+        // one question is enough; a keyboard already stuck gets a short wait.
+        const bool retry = m_connection == NotResponding;
+        m_link->setTimeoutMs(retry ? stuckTimeoutMs : replyTimeoutMs);
+        m_firmware = Protocol::versionFromReply(m_link->transact(Protocol::queryVersion()), m_node.reportId > 0);
         if (m_node.reportId == 0 && m_firmware.isEmpty()) {
             // On the cable the keyboard always answers; silence means it is stuck.
-            m_link.reset();
-            if (m_connection != NotResponding) {
-                m_connection = NotResponding;
-                emit connectionChanged();
-            }
+            markNotResponding();
             return;
         }
+        m_link->setTimeoutMs(replyTimeoutMs);
         m_battery = Protocol::batteryFromReply(m_link->transact(Protocol::queryBattery()));
         m_asleep = m_node.reportId > 0 && m_firmware.isEmpty();
         m_connection = Connected;
@@ -205,6 +225,10 @@ void Backend::refreshBattery() {
     const QByteArray reply = m_link->transact(Protocol::queryBattery());
     if (auto *hid = dynamic_cast<HidrawLink *>(m_link.get()); hid && hid->failed()) {
         disconnectDevice();
+        return;
+    }
+    if (m_node.reportId == 0 && reply.isEmpty()) {
+        markNotResponding(); // on the cable silence means stuck, not asleep
         return;
     }
     if (m_node.reportId > 0 && Protocol::isRejected(reply)) {

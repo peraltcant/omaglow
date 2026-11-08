@@ -111,6 +111,8 @@ public:
     // still does, so the connection stays up while the keyboard sleeps.
     bool asleep() const { return m_asleep; }
     Q_INVOKABLE void checkWake();
+    // The regular check (every 2 s): connection, wake-up, battery, the mouse.
+    void poll();
     // Reads the battery; behind the receiver an unanswered query means asleep.
     void refreshBattery();
     int battery() const { return m_battery; }
@@ -359,6 +361,8 @@ private:
     bool m_oledClock = false;
     ServiceRunner m_serviceRunner;
     MouseOpener m_mouseOpener;
+    int m_stuckPolls = 0;
+    void markNotResponding();
     Finder m_mouseFinder;
     AsusctlRunner m_asusctl;
     bool m_followTheme = false;

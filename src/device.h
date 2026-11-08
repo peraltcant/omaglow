@@ -12,6 +12,8 @@ public:
     // Writes a report the keyboard doesn't answer, like all but one of a
     // direct mode frame's; false when the channel is gone.
     virtual bool post(const QByteArray &packet) { return !transact(packet).isEmpty(); }
+    // How long transact() waits for an answer.
+    virtual void setTimeoutMs(int) {}
 };
 
 // The vendor channel through a Linux hidraw node.
@@ -38,6 +40,7 @@ public:
     QByteArray transact(const QByteArray &packet) override;
     bool post(const QByteArray &packet) override;
     bool failed() const { return m_failed; }
+    void setTimeoutMs(int ms) override { m_timeoutMs = ms; }
 
 private:
     void drain();
