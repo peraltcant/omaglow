@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QColor>
+#include <QSet>
 #include <QHash>
 #include <QList>
 #include <QSettings>
@@ -35,8 +36,21 @@ QList<QByteArray> packets(const Keys &keys, int brightness);
 enum LayerEffect {
     StaticLayer, Breathing, Strobing, ColorCycle, Rainbow, StarryNight, Comet, Tide, Current,
     Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
+    // Live ones, drawn from what the lights service gathers (Live below).
+    Music, Workspaces,
     LayerEffectCount
 };
+
+// What the live effects show at a moment. Gathered by the lights service
+// only while a layer needs it; empty values draw dark keys.
+struct Live {
+    QList<int> spectrum;      // audio bands 0-255, low to high
+    QSet<int> busyWorkspaces; // Hyprland workspaces with windows
+    int activeWorkspace = 0;
+};
+
+// Which live inputs a lighting's layers use.
+enum LiveNeed { NeedsMusic = 1, NeedsWorkspaces = 2 };
 
 // A group of keys with one effect. Later layers cover earlier ones.
 struct Layer {
@@ -70,7 +84,11 @@ bool sameLook(const ProfileLighting &a, const ProfileLighting &b);
 // The custom lighting at a moment, in milliseconds from any fixed start.
 // The same moment always draws the same frame, so the app's preview and the
 // service agree. Brightness is applied when sending, not here.
-Keys render(const ProfileLighting &lighting, qint64 ms);
+Keys render(const ProfileLighting &lighting, qint64 ms, const Live &live = {});
+// LiveNeed flags for the layers that show keys.
+int liveNeeds(const ProfileLighting &lighting);
+// Made-up live values for the app's preview, which has no service behind it.
+Live demoLive(qint64 ms);
 // Whether it changes over time and has to be streamed.
 bool animated(const ProfileLighting &lighting);
 // How often a streamed frame is sent.

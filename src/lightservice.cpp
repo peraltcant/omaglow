@@ -87,6 +87,7 @@ void LightService::tick() {
     const int profile = qBound(1, m_settings->value("device/profile", int(Protocol::DefaultProfile)).toInt(),
                                int(Protocol::DefaultProfile));
     m_streamed = Design::load(*m_settings, profile); // edits show on the next frame
+    m_live.setNeeds(Design::animated(m_streamed) ? Design::liveNeeds(m_streamed) : 0);
     if (!Design::animated(m_streamed)) {
         // The app draws still lighting itself.
         if (m_frameTimer.isActive())
@@ -114,7 +115,7 @@ void LightService::sendFrame() {
         m_startedAt = now;
     }
     const QList<QByteArray> packets =
-        Design::packets(Design::render(m_streamed, m_clock.elapsed()), m_streamed.lighting.brightness);
+        Design::packets(Design::render(m_streamed, m_clock.elapsed(), m_live.snapshot()), m_streamed.lighting.brightness);
     // Try again from the next check, when the keyboard may be back.
     if (!sendAll(packets))
         m_frameTimer.stop();

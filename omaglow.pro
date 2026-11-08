@@ -5,6 +5,7 @@ TARGET = omaglow
 TEMPLATE = app
 
 HEADERS += \
+    src/live.h \
     src/backend.h \
     src/device.h \
     src/clockservice.h \
@@ -24,6 +25,7 @@ HEADERS += \
     src/appinfo.h
 
 SOURCES += \
+    src/live.cpp \
     src/main.cpp \
     src/backend.cpp \
     src/device.cpp \

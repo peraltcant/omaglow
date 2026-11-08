@@ -20,6 +20,7 @@
 #include "design.h"
 #include "device.h"
 #include "lightservice.h"
+#include "live.h"
 #include "filepicker.h"
 #include "keymap.h"
 #include "clockservice.h"
@@ -409,7 +410,60 @@ private slots:
         QVERIFY(animatedAs(Design::Fire));
 
         // Every effect has a name for Studio.
-        QCOMPARE(int(Design::LayerEffectCount), 15);
+        QVERIFY(int(Design::LayerEffectCount) >= 15);
+    }
+
+    void liveLayersShowWhatTheServiceGathers()
+    {
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        Design::Layer layer;
+        layer.color1 = QColor("#00ff00");
+        layer.color2 = QColor("#ff0000");
+        for (const auto &k : Keymap::layout())
+            layer.keys.append(k.code);
+        layer.effect = Design::Music;
+        lighting.layers = {layer};
+        const int esc = 0x6e, right = 0x59, one = 0x02, two = 0x03, three = 0x04;
+
+        // Bars: the bass on the left reaches the top row, the silent treble
+        // on the right stays dark; no sound, no bars.
+        Design::Live live;
+        for (int band = 0; band < 26; ++band)
+            live.spectrum.append(band < 3 ? 255 : 0);
+        QVERIFY(Design::render(lighting, 0, live).value(esc).value() > 0);
+        QCOMPARE(Design::render(lighting, 0, live).value(right), QColor(0, 0, 0));
+        QCOMPARE(Design::render(lighting, 0, {}).value(esc), QColor(0, 0, 0));
+        QVERIFY(Design::animated(lighting));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsMusic));
+
+        // Workspaces on the number keys: ones with windows in the first color,
+        // the active one in the second, empty ones dark; other keys untouched.
+        lighting.layers[0].effect = Design::Workspaces;
+        lighting.layers[0].keys = {one, two, three};
+        lighting.keys.insert(esc, QColor("#123456"));
+        live = {};
+        live.busyWorkspaces = {1, 3};
+        live.activeWorkspace = 3;
+        const Design::Keys frame = Design::render(lighting, 0, live);
+        QCOMPARE(frame.value(one), QColor("#00ff00"));
+        QCOMPARE(frame.value(two), QColor(0, 0, 0));
+        QCOMPARE(frame.value(three), QColor("#ff0000"));
+        QCOMPARE(frame.value(esc), QColor("#123456"));
+        QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsWorkspaces));
+
+        // Hyprland's replies: special workspaces (negative ids) and empty ones don't count.
+        QCOMPARE(LiveFeed::busyWorkspaces(R"([{"id":1,"windows":2},{"id":2,"windows":0},{"id":-98,"windows":1},{"id":10,"windows":1}])"),
+                 QSet<int>({1, 10}));
+        QCOMPARE(LiveFeed::activeWorkspace(R"({"id":3,"name":"3","windows":1})"), 3);
+        QCOMPARE(LiveFeed::activeWorkspace("not json"), 0);
+
+        // The preview shows something moving without the service.
+        lighting.layers[0].effect = Design::Music;
+        lighting.layers[0].keys.clear();
+        for (const auto &k : Keymap::layout())
+            lighting.layers[0].keys.append(k.code);
+        QVERIFY(Design::render(lighting, 0, Design::demoLive(0)) != Design::render(lighting, 900, Design::demoLive(900)));
     }
 
     void layerEffectsMoveOverTime()

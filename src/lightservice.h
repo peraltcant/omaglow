@@ -10,6 +10,7 @@
 
 #include "design.h"
 #include "device.h"
+#include "live.h"
 
 // Streams the profile's custom lighting frame by frame while its layers move;
 // the keyboard can't draw them on its own. Runs headless as `omaglow lights`,
@@ -50,5 +51,6 @@ private:
     qint64 m_startedAt = -1; // when the color cycle step was last sent
     Design::ProfileLighting m_streamed;
     QFileSystemWatcher m_watcher;
+    LiveFeed m_live; // what live layers show, gathered while they are shown
     QTimer m_reload;
 };

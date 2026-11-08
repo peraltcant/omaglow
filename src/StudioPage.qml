@@ -15,16 +15,17 @@ ScrollView {
     readonly property var current: layerIndex >= 0 && layerIndex < backend.layers.length ? backend.layers[layerIndex] : null
     // Effects that use the colors, and the ones where random colors make sense.
     // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
-    // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient.
+    // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
+    // then the live ones: Music, Workspaces.
     readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true]
     readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true]
     readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
-                                       false, true, false, true, false, false]
-    // Still effects have no speed.
+                                       false, true, false, true, false, false, false, false]
+    // Still effects, and live ones that follow their source, have no speed.
     readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
-                                      true, true, true, true, true, false]
+                                      true, true, true, true, true, false, false, false]
     // 0 one color, 1 two colors, 2 random; one color is the same color twice.
     readonly property int colorMode: !current ? -1
         : current.randomColors && usesRandom[current.effect] ? 2

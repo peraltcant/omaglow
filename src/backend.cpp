@@ -446,7 +446,8 @@ bool Backend::animatedLighting() const {
 QStringList Backend::layerEffects() const {
     return {tr("Static"), tr("Breathing"), tr("Strobing"), tr("Color cycle"),
             tr("Rainbow"), tr("Starry night"), tr("Comet"), tr("Tide"), tr("Current"),
-            tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient")};
+            tr("Fire"), tr("Plasma"), tr("Scanner"), tr("Fireflies"), tr("Heartbeat"), tr("Gradient"),
+            tr("Music"), tr("Workspaces")};
 }
 
 // A layer edit shows the custom lighting; false for an index out of range.
@@ -534,7 +535,7 @@ void Backend::setLayerKeys(int index, const QList<int> &codes, bool add) {
 
 QVariantMap Backend::frameAt(qint64 ms) const {
     QVariantMap map;
-    const Design::Keys frame = Design::render(current(), ms);
+    const Design::Keys frame = Design::render(current(), ms, Design::demoLive(ms));
     for (auto it = frame.begin(); it != frame.end(); ++it)
         map.insert(QString::number(it.key()), it.value());
     return map;

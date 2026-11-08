@@ -79,7 +79,7 @@ double centerOf(int code) {
     return key ? key->x + key->width / 2 : 0;
 }
 
-void drawLayer(const Layer &layer, qint64 ms, Keys &out) {
+void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
     if (layer.keys.isEmpty())
         return;
     const qint64 period = periodMs[qBound(0, layer.speed, 2)];
@@ -196,6 +196,32 @@ void drawLayer(const Layer &layer, qint64 ms, Keys &out) {
         case Gradient:
             c = mixed(layer.color1, layer.color2, across(x));
             break;
+        case Music: {
+            // A bar per column, its band by position; lit up to the band's level.
+            if (live.spectrum.isEmpty()) {
+                c = QColor(0, 0, 0);
+                break;
+            }
+            const int band = qRound(across(x) * (live.spectrum.size() - 1));
+            const double level = live.spectrum.at(band) / 255.0;
+            const double rows = maxY - minY + 1;
+            const double threshold = (up(code) * (rows - 1) + 0.5) / rows;
+            c = level >= threshold ? mixed(layer.color1, layer.color2, up(code)) : QColor(0, 0, 0);
+            break;
+        }
+        case Workspaces: {
+            // Number keys only: 1-9, and 0 for workspace 10.
+            bool number = false;
+            int workspace = QString::fromUtf8(Keymap::find(code)->label).toInt(&number);
+            if (!number)
+                continue;
+            if (workspace == 0)
+                workspace = 10;
+            c = workspace == live.activeWorkspace         ? layer.color2
+                : live.busyWorkspaces.contains(workspace) ? layer.color1
+                                                          : QColor(0, 0, 0);
+            break;
+        }
         case Tide:
             c = mixed(layer.color2, layer.color1, 0.5 + 0.5 * std::sin(2 * M_PI * (x / 6.0 - t)));
             break;
@@ -208,11 +234,36 @@ void drawLayer(const Layer &layer, qint64 ms, Keys &out) {
 
 } // namespace
 
-Keys render(const ProfileLighting &lighting, qint64 ms) {
+Keys render(const ProfileLighting &lighting, qint64 ms, const Live &live) {
     Keys out = lighting.keys;
     for (const Layer &layer : lighting.layers)
-        drawLayer(layer, qMax<qint64>(0, ms), out);
+        drawLayer(layer, qMax<qint64>(0, ms), live, out);
     return out;
+}
+
+int liveNeeds(const ProfileLighting &lighting) {
+    int needs = 0;
+    if (!lighting.on || !lighting.custom)
+        return needs;
+    for (const Layer &layer : lighting.layers) {
+        if (layer.keys.isEmpty())
+            continue;
+        if (layer.effect == Music)
+            needs |= NeedsMusic;
+        else if (layer.effect == Workspaces)
+            needs |= NeedsWorkspaces;
+    }
+    return needs;
+}
+
+Live demoLive(qint64 ms) {
+    Live live;
+    const double s = ms / 1000.0;
+    for (int band = 0; band < 26; ++band)
+        live.spectrum.append(qBound(0, int(255 * (0.55 + 0.45 * std::sin(s * 3 + band * 0.7)) * (1 - band / 40.0)), 255));
+    live.busyWorkspaces = {1, 2, 4};
+    live.activeWorkspace = 2;
+    return live;
 }
 
 bool animated(const ProfileLighting &lighting) {
