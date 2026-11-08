@@ -80,7 +80,12 @@ double centerOf(int code) {
 }
 
 void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
-    if (layer.keys.isEmpty())
+    // Only keys the keyboard has; a hand-edited layer could name others.
+    QList<int> keys;
+    for (int code : layer.keys)
+        if (Keymap::find(code))
+            keys.append(code);
+    if (keys.isEmpty())
         return;
     const qint64 period = periodMs[qBound(0, layer.speed, 2)];
     const double t = double(ms % period) / period;
@@ -88,7 +93,7 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
     // The current's path: row by row, left to right then back (a zigzag).
     QList<int> path;
     if (layer.effect == Current) {
-        path = layer.keys;
+        path = keys;
         std::sort(path.begin(), path.end(), [](int a, int b) {
             const Keymap::Key *ka = Keymap::find(a), *kb = Keymap::find(b);
             if (ka->y != kb->y)
@@ -97,7 +102,7 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
         });
     }
     double minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
-    for (int code : layer.keys) {
+    for (int code : keys) {
         minX = qMin(minX, centerOf(code));
         maxX = qMax(maxX, centerOf(code));
         const double y = Keymap::find(code)->y;
@@ -109,7 +114,7 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
     auto up = [&](int code) { return maxY > minY ? (maxY - Keymap::find(code)->y) / (maxY - minY) : 0.0; };
     // Time in cycles, for the effects that move smoothly instead of looping.
     const double cycles = double(ms) / period;
-    for (int code : layer.keys) {
+    for (int code : keys) {
         const double x = centerOf(code);
         QColor c;
         switch (layer.effect) {
@@ -247,9 +252,9 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             else {
                 // Each key holds its share of the time, the rightmost going first.
                 int rank = 0;
-                for (int other : layer.keys)
+                for (int other : keys)
                     rank += centerOf(other) < x;
-                c = 1 - double(elapsed) / duration > double(rank) / layer.keys.size() ? layer.color1 : QColor(0, 0, 0);
+                c = 1 - double(elapsed) / duration > double(rank) / keys.size() ? layer.color1 : QColor(0, 0, 0);
             }
             break;
         }
@@ -273,6 +278,9 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
                                                : mixed(layer.color1, layer.color2, qMin(1.0, distance / 6));
                 }
             }
+            // Keys no ripple reaches show what is under the layer.
+            if (best <= 0)
+                continue;
             c = scaled(color, best);
             break;
         }

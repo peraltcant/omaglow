@@ -42,6 +42,11 @@ LiveFeed::LiveFeed(QObject *parent) : QObject(parent) {
         if (m_samples.size() > Spectrum::WindowSize * 4)
             m_samples.remove(0, m_samples.size() - Spectrum::WindowSize);
     });
+    // Bars from a recorder that stopped would freeze; show none instead.
+    connect(&m_recorder, &QProcess::finished, this, [this] {
+        m_samples.clear();
+        m_pending.clear();
+    });
     connect(&m_recorder, &QProcess::errorOccurred, this, [](QProcess::ProcessError) {
         qInfo("can't run parec (pulseaudio-utils / pipewire-pulse); music layers stay dark");
     });

@@ -1315,8 +1315,17 @@ void Backend::deleteLook(int index) {
     storeLooks();
 }
 
+// Running from its start until the longest timer layer has finished and
+// blinked its minute out.
 bool Backend::timerRunning() const {
-    return m_settings->value("timer/startedAt", 0).toLongLong() > 0;
+    const qint64 started = m_settings->value("timer/startedAt", 0).toLongLong();
+    if (started <= 0)
+        return false;
+    int minutes = Design::DefaultTimerMinutes;
+    for (const Design::Layer &layer : m_layers)
+        if (layer.effect == Design::Timer && layer.option > 0)
+            minutes = qMax(minutes, layer.option);
+    return QDateTime::currentMSecsSinceEpoch() - started < qint64(minutes) * 60000 + Design::TimerDoneMs;
 }
 
 // The lights service picks the start up from the settings, as it does edits.

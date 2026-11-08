@@ -89,17 +89,25 @@ void LightService::tick() {
     const int profile = qBound(1, m_settings->value("device/profile", int(Protocol::DefaultProfile)).toInt(),
                                int(Protocol::DefaultProfile));
     m_streamed = Design::load(*m_settings, profile); // edits show on the next frame
-    m_live.setNeeds(Design::animated(m_streamed) ? Design::liveNeeds(m_streamed) : 0);
     m_timerStartedAt = m_settings->value("timer/startedAt", 0).toLongLong();
     if (!Design::animated(m_streamed)) {
         // The app draws still lighting itself.
         if (m_frameTimer.isActive())
             qInfo() << "stopped streaming";
         m_frameTimer.stop();
+        m_live.setNeeds(0);
         return;
     }
-    if (m_frameTimer.isActive() || !ensureLink())
+    // Live sources (audio, the keyboard's keys...) run only while frames go out.
+    if (m_frameTimer.isActive()) {
+        m_live.setNeeds(Design::liveNeeds(m_streamed));
         return;
+    }
+    if (!ensureLink()) {
+        m_live.setNeeds(0);
+        return;
+    }
+    m_live.setNeeds(Design::liveNeeds(m_streamed));
     qInfo().noquote() << "streaming profile" << profile;
     m_startedAt = -1;
     m_frameTimer.start();
@@ -113,6 +121,7 @@ void LightService::sendFrame() {
     if (m_startedAt < 0 || now - m_startedAt >= restartMs) {
         if (!sendAll({Protocol::directStart()})) {
             m_frameTimer.stop();
+            m_live.setNeeds(0);
             return;
         }
         m_startedAt = now;
@@ -123,6 +132,8 @@ void LightService::sendFrame() {
     const QList<QByteArray> packets =
         Design::packets(Design::render(m_streamed, m_clock.elapsed(), live), m_streamed.lighting.brightness);
     // Try again from the next check, when the keyboard may be back.
-    if (!sendAll(packets))
+    if (!sendAll(packets)) {
         m_frameTimer.stop();
+        m_live.setNeeds(0);
+    }
 }

@@ -607,12 +607,20 @@ private slots:
 
         // The pressed key lights at once, the ring reaches its neighbor a
         // moment later, a far key stays dark, and it all fades out.
+        // Keys without a ripple show what is under the layer.
+        for (const auto &k : Keymap::layout())
+            lighting.keys.insert(k.code, QColor("#102030"));
         QCOMPARE(Design::render(lighting, 1000, live).value(g), QColor("#ffffff"));
-        QCOMPARE(Design::render(lighting, 1000, live).value(esc), QColor(0, 0, 0));
-        QVERIFY(Design::render(lighting, 1250, live).value(h).value() > 0);
-        QCOMPARE(Design::render(lighting, 1000, live).value(p), QColor(0, 0, 0));
-        QCOMPARE(Design::render(lighting, 2600, live).value(g), QColor(0, 0, 0));
-        QCOMPARE(Design::render(lighting, 1000, {}).value(g), QColor(0, 0, 0));
+        QCOMPARE(Design::render(lighting, 1000, live).value(esc), QColor("#102030"));
+        QVERIFY(Design::render(lighting, 1250, live).value(h).value() > QColor("#102030").value());
+        QCOMPARE(Design::render(lighting, 1000, live).value(p), QColor("#102030"));
+        QCOMPARE(Design::render(lighting, 2600, live).value(g), QColor("#102030"));
+        QCOMPARE(Design::render(lighting, 1000, {}).value(g), QColor("#102030"));
+        // A key code the keyboard hasn't, from a hand-edited layer, is skipped.
+        lighting.layers[0].keys.append(0x7fff);
+        lighting.layers[0].effect = Design::Fire;
+        QVERIFY(!Design::render(lighting, 500, live).contains(0x7fff));
+        lighting.layers[0].effect = Design::Typing;
         QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsTyping));
 
         // Key reports to Azoth keys: USB usages to the keyboard's own codes,
@@ -2141,6 +2149,15 @@ private slots:
         QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 45);
         backend->setLayerOption(index, 500);
         QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 45);
+
+        // A timer that finished and blinked its minute out is no longer running.
+        backend->setLayerKeys(index, {0x02, 0x03}, true);
+        settings.setValue("timer/startedAt", QDateTime::currentMSecsSinceEpoch() - 47 * 60000);
+        settings.sync();
+        QVERIFY(!backend->timerRunning());
+        settings.setValue("timer/startedAt", QDateTime::currentMSecsSinceEpoch() - 44 * 60000);
+        settings.sync();
+        QVERIFY(backend->timerRunning());
     }
 
     void lightServicePacesItsReports()
