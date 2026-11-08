@@ -38,6 +38,7 @@ public:
     bool asleep = false; // behind the receiver, only the receiver answers
     bool mute = false;   // plugged in but not answering at all
     int timeoutMs = 400; // what the backend last set
+    int dropNext = 0;    // this many replies are lost, then it answers again
     void setTimeoutMs(int ms) override { timeoutMs = ms; }
     bool checkLock = false; // count reports sent without holding the keyboard lock
     QList<qint64> *times = nullptr; // when each report went out, in ms
@@ -73,6 +74,10 @@ public:
         }
         if (mute)
             return {};
+        if (dropNext > 0) {
+            --dropNext;
+            return {};
+        }
         if (asleep)
             return packet.startsWith(QByteArray::fromHex("1200"))
                 ? QByteArray::fromHex("1200000008000700000000000000") : QByteArray::fromHex("ffaa");
@@ -1718,6 +1723,18 @@ private slots:
         for (int i = 0; i < 15; ++i)
             backend->poll();
         QCOMPARE(backend->connection(), int(Backend::NotResponding));
+    }
+
+    void oneLostBatteryReplyIsNotAStuckKeyboard()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        // A reply can come late while the light stream is busy: ask again first.
+        link->dropNext = 1;
+        for (int i = 0; i < 15; ++i)
+            backend->poll();
+        QCOMPARE(backend->connection(), int(Backend::Connected));
     }
 
     void looksShowWhichOneIsOn()
