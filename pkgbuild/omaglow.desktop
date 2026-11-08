@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Omaglow
+Comment=Lighting and settings for your keyboard, mouse and laptop: ROG Azoth, Razer DeathAdder V2, ASUS Aura
+Comment[es]=Iluminación y ajustes de teclado, mouse y laptop: ROG Azoth, Razer DeathAdder V2, ASUS Aura
+Exec=omaglow
+Icon=omaglow
+Terminal=false
+Categories=Utility;Settings;HardwareSettings;
+StartupWMClass=omaglow

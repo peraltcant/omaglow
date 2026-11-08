@@ -1,0 +1,2 @@
+# Razer DeathAdder V2 (1532:0084): lighting through feature reports, as OpenRazer sends them.
+KERNEL=="hidraw*", ATTRS{idVendor}=="1532", ATTRS{idProduct}=="0084", TAG+="uaccess"

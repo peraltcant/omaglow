@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/build"
+cd "$ROOT/pkgbuild"
+# Per-game rules were removed; their service goes before its unit file does.
+systemctl --user disable --now azoth-games.service 2>/dev/null || true
+# azoth was renamed Omaglow: the services it had on come back under the new name.
+# The list is kept until they are, so a failed or declined install can be run again.
+STATE="${XDG_RUNTIME_DIR:-/tmp}/omaglow-services-from-azoth"
+for what in clock music lights; do
+  if systemctl --user is-enabled --quiet "azoth-$what.service" 2>/dev/null; then
+    echo "$what" >> "$STATE"
+  fi
+  systemctl --user disable --now "azoth-$what.service" 2>/dev/null || true
+done
+makepkg -fsi "$@"
+# New device rules apply to devices already plugged in only after a trigger.
+sudo udevadm control --reload-rules 2>/dev/null || true
+sudo udevadm trigger --subsystem-match=hidraw --action=change 2>/dev/null || true
+# A changed unit file isn't read until systemd reloads.
+systemctl --user daemon-reload 2>/dev/null || true
+if [ -f "$STATE" ]; then
+  for what in $(sort -u "$STATE"); do
+    systemctl --user enable --now "omaglow-$what.service" 2>/dev/null || true
+  done
+  rm -f "$STATE"
+fi
+# The theme hook azoth installed calls a binary that is gone now.
+HOOKS="$HOME/.config/omarchy/hooks/theme-set.d"
+if [ -f "$HOOKS/50-azoth" ]; then
+  sed 's/azoth/omaglow/g' "$HOOKS/50-azoth" > "$HOOKS/50-omaglow"
+  chmod +x "$HOOKS/50-omaglow"
+  rm -f "$HOOKS/50-azoth"
+fi
+# Running services keep the old binary until they restart.
+systemctl --user try-restart omaglow-lights.service omaglow-clock.service omaglow-music.service 2>/dev/null || true

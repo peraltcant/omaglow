@@ -1,0 +1,38 @@
+pkgname=omaglow
+pkgver=0.25.0
+pkgrel=1
+pkgdesc='Lighting and settings for the ROG Azoth keyboard, Razer DeathAdder V2 mouse and ASUS Aura laptops'
+arch=('x86_64' 'aarch64')
+license=('MIT' 'ISC')
+# Formerly azoth; installing this replaces it.
+provides=('azoth')
+conflicts=('azoth' 'azoth-debug')
+replaces=('azoth' 'azoth-debug')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'xdg-desktop-portal' 'libpulse')
+makedepends=('gcc' 'make')
+source=()
+sha256sums=()
+
+build() {
+  cd "$startdir/.."
+  ./bin/build
+}
+
+package() {
+  cd "$startdir/.."
+  install -Dm755 build/omaglow "$pkgdir/usr/bin/omaglow"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # The bundled Lucide icons.
+  install -Dm644 src/icons/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LUCIDE-LICENSE"
+  install -Dm644 "$startdir/omaglow.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omaglow.svg"
+  install -Dm644 "$startdir/omaglow.desktop" "$pkgdir/usr/share/applications/omaglow.desktop"
+  # Lets the logged-in user reach the keyboard's vendor channel without root.
+  install -Dm644 "$startdir/70-omaglow-rog-azoth.rules" "$pkgdir/usr/lib/udev/rules.d/70-omaglow-rog-azoth.rules"
+  install -Dm644 "$startdir/70-omaglow-razer.rules" "$pkgdir/usr/lib/udev/rules.d/70-omaglow-razer.rules"
+  # Pushes the time to the OLED clock; the app enables it only while the clock is shown.
+  install -Dm644 "$startdir/omaglow-clock.service" "$pkgdir/usr/lib/systemd/user/omaglow-clock.service"
+  # Streams spectrum bars; the app enables it only while the music display is shown.
+  install -Dm644 "$startdir/omaglow-music.service" "$pkgdir/usr/lib/systemd/user/omaglow-music.service"
+  install -Dm644 "$startdir/omaglow-lights.service" "$pkgdir/usr/lib/systemd/user/omaglow-lights.service"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/omaglow/README.md"
+}

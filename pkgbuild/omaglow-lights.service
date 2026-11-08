@@ -1,0 +1,12 @@
+[Unit]
+Description=Stream moving ROG Azoth key layers
+Documentation=file:///usr/share/doc/omaglow/README.md
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/omaglow lights
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target

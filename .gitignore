@@ -1,0 +1,6 @@
+/build/
+/pkgbuild/pkg/
+/pkgbuild/src/
+*.pkg.tar.*
+# Local work notes, not published.
+/odd/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Show what is playing as spectrum bars on the ROG Azoth OLED
+Documentation=file:///usr/share/doc/omaglow/README.md
+After=pipewire-pulse.service
+
+[Service]
+ExecStart=/usr/bin/omaglow music
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

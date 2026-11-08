@@ -1,0 +1,14 @@
+{
+  "%n frames": {
+    "one": "%n frame",
+    "other": "%n frames"
+  },
+  "%n keys changed": {
+    "one": "%n key changed",
+    "other": "%n keys changed"
+  },
+  "%n min": {
+    "one": "%n min",
+    "other": "%n min"
+  }
+}

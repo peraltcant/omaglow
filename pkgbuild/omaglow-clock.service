@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep the ROG Azoth OLED clock on time
+Documentation=file:///usr/share/doc/omaglow/README.md
+
+[Service]
+ExecStart=/usr/bin/omaglow clock
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
