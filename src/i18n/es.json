@@ -246,5 +246,9 @@
   "Minutes": "Minutos",
   "Start timer": "Iniciar temporizador",
   "Stop timer": "Detener temporizador",
-  "Omaglow reads which keys you press to light them, only while this layer shows. Nothing is stored or sent.": "Omaglow lee qué teclas presionas para iluminarlas, sólo mientras se muestra esta capa. No se guarda ni se envía nada."
+  "Omaglow reads which keys you press to light them, only while this layer shows. Nothing is stored or sent.": "Omaglow lee qué teclas presionas para iluminarlas, sólo mientras se muestra esta capa. No se guarda ni se envía nada.",
+  "Done": "Terminado",
+  "%1 left": "Quedan %1",
+  "The timer keys go dark one by one, the rightmost first, then blink when the time is up.": "Las teclas del temporizador se apagan una por una, empezando por la derecha, y parpadean cuando se acaba el tiempo.",
+  "%1 min": "%1 min"
 }

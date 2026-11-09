@@ -120,6 +120,60 @@ ScrollView {
                 spacing: 20
                 opacity: backend.lightingOn ? 1 : 0.4
 
+                // The timer of a look with timer layers (Focus's Pomodoro), here
+                // so it can be started without opening Studio.
+                Section {
+                    id: timerSection
+                    icon: "timer"
+                    title: qsTr("Timer")
+                    visible: backend.customLighting && backend.timerMinutes > 0
+                    property real remaining: -1
+                    function refresh() { remaining = backend.timerRemainingMs() }
+                    readonly property var choices: [5, 15, 25, 45, 60]
+                    Timer {
+                        interval: 1000
+                        repeat: true
+                        triggeredOnStart: true
+                        running: timerSection.visible && backend.timerRunning
+                        onTriggered: timerSection.refresh()
+                    }
+                    Connections {
+                        target: backend
+                        function onTimerChanged() { timerSection.refresh() }
+                    }
+                    RowLayout {
+                        spacing: 12
+                        Label {
+                            Layout.fillWidth: true
+                            font.pixelSize: 22
+                            font.bold: true
+                            text: !backend.timerRunning ? qsTr("%1 min").arg(backend.timerMinutes)
+                                : timerSection.remaining <= 0 ? qsTr("Done")
+                                : qsTr("%1 left").arg(Math.floor(timerSection.remaining / 60000) + ":"
+                                      + String(Math.floor(timerSection.remaining / 1000) % 60).padStart(2, "0"))
+                        }
+                        Button {
+                            text: backend.timerRunning ? qsTr("Stop timer") : qsTr("Start timer")
+                            icon.source: backend.timerRunning ? "qrc:/icons/square.svg" : "qrc:/icons/timer.svg"
+                            highlighted: !backend.timerRunning
+                            onClicked: backend.timerRunning ? backend.stopTimer() : backend.startTimer()
+                        }
+                    }
+                    Segmented {
+                        // Changing the minutes of a running timer is confusing; stop it first.
+                        enabled: !backend.timerRunning
+                        options: timerSection.choices.map(m => qsTr("%1 min").arg(m))
+                        current: timerSection.choices.indexOf(backend.timerMinutes)
+                        onPicked: (i) => backend.setTimerMinutes(timerSection.choices[i])
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                        text: qsTr("The timer keys go dark one by one, the rightmost first, then blink when the time is up.")
+                    }
+                }
+
                 Section {
                     icon: "sliders-horizontal"
                     title: qsTr("Settings")

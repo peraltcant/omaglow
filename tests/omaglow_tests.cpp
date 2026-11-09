@@ -2168,6 +2168,38 @@ private slots:
         QVERIFY(backend->timerRunning());
     }
 
+    void timerIsControlledFromLighting()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
+        // No timer layer, no control.
+        QCOMPARE(backend->timerMinutes(), 0);
+        QCOMPARE(backend->timerRemainingMs(), qint64(-1));
+
+        const int index = backend->addLayer("");
+        backend->setLayerEffect(index, Design::Timer);
+        backend->setLayerKeys(index, {0x02, 0x03}, true);
+        QCOMPARE(backend->timerMinutes(), 25); // no minutes set means 25
+        backend->setTimerMinutes(5);
+        QCOMPARE(backend->timerMinutes(), 5);
+        QCOMPARE(backend->layers()[index].toMap().value("option").toInt(), 5);
+        backend->setTimerMinutes(0); // refused
+        QCOMPARE(backend->timerMinutes(), 5);
+
+        QCOMPARE(backend->timerRemainingMs(), qint64(-1)); // stopped
+        backend->startTimer();
+        const qint64 left = backend->timerRemainingMs();
+        QVERIFY(left > 5 * 60000 - 5000 && left <= 5 * 60000);
+        backend->stopTimer();
+        QCOMPARE(backend->timerRemainingMs(), qint64(-1));
+
+        // A timer layer without keys draws nothing, so it gets no control.
+        backend->setLayerKeys(index, {0x02, 0x03}, false);
+        QCOMPARE(backend->timerMinutes(), 0);
+    }
+
     void lightServicePacesItsReports()
     {
         // Reports sent back to back left the keyboard stuck after minutes of

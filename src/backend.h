@@ -54,6 +54,8 @@ class Backend : public QObject {
     Q_PROPERTY(bool animatedLighting READ animatedLighting NOTIFY lightingChanged)
     // The timer layers' countdown, shared by all of them.
     Q_PROPERTY(bool timerRunning READ timerRunning NOTIFY timerChanged)
+    // The minutes of the shown lighting's timer layers, 0 when it has none.
+    Q_PROPERTY(int timerMinutes READ timerMinutes NOTIFY lightingChanged)
     Q_PROPERTY(QStringList layerEffects READ layerEffects CONSTANT)
 
     Q_PROPERTY(bool oledOn READ oledOn WRITE setOledOn NOTIFY oledChanged)
@@ -169,6 +171,11 @@ public:
     bool timerRunning() const;
     Q_INVOKABLE void startTimer();
     Q_INVOKABLE void stopTimer();
+    int timerMinutes() const;
+    // Sets every timer layer's minutes (1-120).
+    Q_INVOKABLE void setTimerMinutes(int minutes);
+    // Until the timer is done, 0 or less once it is; -1 when stopped.
+    Q_INVOKABLE qint64 timerRemainingMs() const;
     // which: 0 for the first color, 1 for the second.
     Q_INVOKABLE void setLayerColor(int index, int which, const QColor &color);
     Q_INVOKABLE void setLayerRandom(int index, bool on);

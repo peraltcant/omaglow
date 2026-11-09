@@ -1321,11 +1321,31 @@ bool Backend::timerRunning() const {
     const qint64 started = m_settings->value("timer/startedAt", 0).toLongLong();
     if (started <= 0)
         return false;
-    int minutes = Design::DefaultTimerMinutes;
-    for (const Design::Layer &layer : m_layers)
-        if (layer.effect == Design::Timer && layer.option > 0)
-            minutes = qMax(minutes, layer.option);
+    const int minutes = qMax(timerMinutes(), int(Design::DefaultTimerMinutes));
     return QDateTime::currentMSecsSinceEpoch() - started < qint64(minutes) * 60000 + Design::TimerDoneMs;
+}
+
+// The longest timer layer that shows keys; each counts its own minutes, so
+// that is the one that finishes last.
+int Backend::timerMinutes() const {
+    int minutes = 0;
+    for (const Design::Layer &layer : m_layers)
+        if (layer.effect == Design::Timer && !layer.keys.isEmpty())
+            minutes = qMax(minutes, layer.option > 0 ? layer.option : int(Design::DefaultTimerMinutes));
+    return minutes;
+}
+
+void Backend::setTimerMinutes(int minutes) {
+    for (int i = 0; i < m_layers.size(); ++i)
+        if (m_layers[i].effect == Design::Timer)
+            setLayerOption(i, minutes);
+}
+
+qint64 Backend::timerRemainingMs() const {
+    const qint64 started = m_settings->value("timer/startedAt", 0).toLongLong();
+    if (started <= 0 || !timerRunning())
+        return -1;
+    return qint64(qMax(timerMinutes(), 1)) * 60000 - (QDateTime::currentMSecsSinceEpoch() - started);
 }
 
 // The lights service picks the start up from the settings, as it does edits.
