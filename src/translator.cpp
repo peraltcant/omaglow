@@ -21,14 +21,28 @@ Translator::Translator(const QString &languageFile, const QString &catalogDirect
     reload();
 }
 
+namespace {
+bool isLanguageCode(const QString &code) {
+    static const QRegularExpression valid("^[a-z]{2,3}(-[A-Za-z]{2})?$");
+    return valid.match(code).hasMatch();
+}
+}
+
 // One registry code on the first line; anything else, or no file, is English.
 QString Translator::readLanguage(const QString &path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return "en";
     const QString code = QString::fromUtf8(file.readLine()).trimmed();
-    static const QRegularExpression valid("^[a-z]{2,3}(-[A-Za-z]{2})?$");
-    return valid.match(code).hasMatch() ? code : "en";
+    return isLanguageCode(code) ? code : "en";
+}
+
+void Translator::setChoice(const QString &code) {
+    if (code == m_choice || (!code.isEmpty() && !isLanguageCode(code)))
+        return;
+    m_choice = code;
+    m_language.clear(); // load again, even if the language comes out the same
+    reload();
 }
 
 // CLDR cardinal plural categories for whole counts, for Omarchy's languages
@@ -106,7 +120,7 @@ void Translator::reload() {
         m_watcher.addPath(m_languageFile);
 
     // Catalogs are compiled in, so only a different language needs a reload.
-    const QString language = readLanguage(m_languageFile);
+    const QString language = m_choice.isEmpty() ? readLanguage(m_languageFile) : m_choice;
     if (language == m_language)
         return;
 

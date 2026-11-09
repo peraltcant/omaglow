@@ -261,9 +261,28 @@ ApplicationWindow {
                             }
                         }
                     }
-                    Label {
+                    // Omarchy's language, or one picked for Omaglow only.
+                    RowLayout {
                         visible: !win.compact
                         Layout.topMargin: 8
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+                        spacing: 6
+                        Icon { glyph: "languages"; size: 16; opacity: 0.6 }
+                        ComboBox {
+                            Layout.fillWidth: true
+                            flat: true
+                            font.pixelSize: 12
+                            readonly property var codes: ["", "en", "es"]
+                            // Language names stay in their own language.
+                            model: [qsTr("Omarchy's language"), "English", "Español"]
+                            currentIndex: Math.max(0, codes.indexOf(translator.choice))
+                            onActivated: (i) => translator.choice = codes[i]
+                        }
+                    }
+                    Label {
+                        visible: !win.compact
+                        Layout.topMargin: 4
                         Layout.leftMargin: 8
                         opacity: 0.35
                         font.pixelSize: 12

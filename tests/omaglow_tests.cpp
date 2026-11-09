@@ -2774,6 +2774,31 @@ private slots:
         QCOMPARE(translator.translate("Main", "%n keys changed", nullptr, 1000000), QString("%n teclas cambiadas"));
     }
 
+    void translatorCanBePinnedToALanguage()
+    {
+        QTemporaryDir dir;
+        write(dir.path() + "/language", "en\n");
+        write(dir.path() + "/es.json", R"({"Save": "Guardar"})");
+        Translator translator(dir.path() + "/language", dir.path());
+        QSignalSpy changed(&translator, &Translator::changed);
+        QCOMPARE(translator.choice(), QString());
+        QVERIFY(translator.translate("Main", "Save").isNull());
+
+        // Picked in Omaglow, whatever Omarchy uses.
+        translator.setChoice("es");
+        QCOMPARE(translator.choice(), QString("es"));
+        QCOMPARE(translator.language(), QString("es"));
+        QCOMPARE(translator.translate("Main", "Save"), QString("Guardar"));
+        QVERIFY(changed.count() >= 1);
+        // Back to following Omarchy.
+        translator.setChoice(QString());
+        QCOMPARE(translator.language(), QString("en"));
+        QVERIFY(translator.translate("Main", "Save").isNull());
+        // Not a language code: refused.
+        translator.setChoice("../../etc");
+        QCOMPARE(translator.choice(), QString());
+    }
+
     void translatorPicksPluralForms()
     {
         QTemporaryDir dir;

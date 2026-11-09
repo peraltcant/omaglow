@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     appLock.tryLock(0);
     app.setApplicationName(AppInfo::Name);
     app.setOrganizationName(AppInfo::Name);
-    app.setApplicationVersion("0.28.0");
+    app.setApplicationVersion("0.29.0");
 
     // Matches the window to omaglow.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.
@@ -116,6 +116,15 @@ int main(int argc, char *argv[]) {
     // re-evaluated when the Omarchy language changes.
     Translator translator;
     app.installTranslator(&translator);
+    // A language picked in Omaglow wins over Omarchy's, and is kept.
+    QSettings uiSettings;
+    translator.setChoice(uiSettings.value("ui/language").toString());
+    QObject::connect(&translator, &Translator::changed, [&] {
+        if (translator.choice().isEmpty())
+            uiSettings.remove("ui/language");
+        else
+            uiSettings.setValue("ui/language", translator.choice());
+    });
 
     Theme theme;
     Backend backend;

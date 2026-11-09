@@ -66,7 +66,8 @@ stored on the keyboard and survive reboots and other computers.
   battery this keeps the keyboard's radio busy, and the stream pauses while
   the keyboard sleeps.
 - Looks: save the current lighting (an effect or a Studio design) with a name
-  and bring it back later; the one showing now is marked. Export a look to a
+  and bring it back later; the one showing now is marked, and starred ones
+  are listed first. Export a look to a
   `.json` file and import look files, to move looks between computers or share
   them (see Look files below).
 
@@ -85,7 +86,8 @@ stored on the keyboard and survive reboots and other computers.
 - Set how long the keyboard waits before sleeping, the battery level for
   the lighting alert, power saving, and the key debounce time.
 - Works over the USB cable and the ROG Omni receiver; follows the Omarchy theme
-  and language (English and Spanish).
+  and language (English and Spanish), or a language picked in the sidebar for
+  Omaglow only.
 
 ## Look files
 
