@@ -264,5 +264,6 @@
   "Exported %1.": "Se exportó %1.",
   "Couldn't import %1: %2": "No se pudo importar %1: %2",
   "The file is too big to be a look.": "El archivo es demasiado grande para ser un estilo.",
-  "Imported %1.": "Se importó %1."
+  "Imported %1.": "Se importó %1.",
+  "Save the lighting you have now with a name. Export a look to a file to keep it or share it, and import files exported from Omaglow.": "Guarda la iluminación actual con un nombre. Exporta un estilo a un archivo para guardarlo o compartirlo, e importa archivos exportados desde Omaglow."
 }

@@ -66,7 +66,9 @@ stored on the keyboard and survive reboots and other computers.
   battery this keeps the keyboard's radio busy, and the stream pauses while
   the keyboard sleeps.
 - Looks: save the current lighting (an effect or a Studio design) with a name
-  and bring it back later; the one showing now is marked.
+  and bring it back later; the one showing now is marked. Export a look to a
+  `.json` file and import look files, to move looks between computers or share
+  them (see Look files below).
 
 ## Devices and theme
 
@@ -84,6 +86,52 @@ stored on the keyboard and survive reboots and other computers.
   the lighting alert, power saving, and the key debounce time.
 - Works over the USB cable and the ROG Omni receiver; follows the Omarchy theme
   and language (English and Spanish).
+
+## Look files
+
+A look exported from Looks is a JSON file that can be read and edited by hand:
+
+```json
+{
+  "omaglow": "look",
+  "version": 1,
+  "name": "Horde",
+  "keyboard": {
+    "on": true,
+    "custom": true,
+    "brightness": 100,
+    "effect": { "name": "static", "speed": "normal", "colors": "single",
+                "color1": "#ff0000", "color2": "#ff00ff", "direction": -1, "thickness": "thick" },
+    "studio": {
+      "design": { "61": "#ff0000" },
+      "layers": [
+        { "name": "War drums", "effect": "shockwave", "speed": "normal",
+          "color1": "#ffffff", "color2": "#ffcc00", "random": false, "keys": [61, 110] }
+      ]
+    }
+  },
+  "mouse": { "logo": { "effect": "breathing", "color1": "#ff0000", "color2": "#ff8000",
+                       "twoColors": true, "brightness": 100 } },
+  "laptop": { "effect": "breathe", "color1": "#ff0000", "color2": "#ffaa00",
+              "speed": "slow", "direction": "right", "brightness": "high" }
+}
+```
+
+- Effects go by name: the keyboard's (`static`, `breathing`, `color-cycle`,
+  `reactive`, `rainbow`, `ripple`, `starry-night`, `quicksand`, `current`,
+  `raindrop`), the layers' (`static`, `breathing`, `strobing`, `color-cycle`,
+  `rainbow`, `starry-night`, `comet`, `tide`, `current`, `fire`, `plasma`,
+  `scanner`, `fireflies`, `heartbeat`, `gradient`, `music`, `workspaces`,
+  `meter`, `notifications`, `timer`, `typing`, `shockwave`, `embers`), the
+  mouse's (`off`, `static`, `breathing`, `spectrum`) and the laptop's
+  (`static`, `breathe`, `rainbow-cycle`, `rainbow-wave`).
+- Keys are the keyboard's key numbers (Esc is 110, the space bar 61). A meter
+  layer adds `"source": "cpu" | "temperature" | "battery"`, a timer layer
+  `"minutes"`.
+- Without `mouse` or `laptop`, applying the look leaves them as they are.
+- Importing refuses files that aren't looks or come from a newer Omaglow, and
+  drops what it can't use inside a look (unknown keys or layer effects,
+  colors that aren't colors). A name already in use gets " (2)".
 
 ## Install
 

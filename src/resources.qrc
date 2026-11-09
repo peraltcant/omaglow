@@ -40,6 +40,8 @@
         <file alias="icons/refresh-cw.svg">icons/refresh-cw.svg</file>
         <file alias="icons/rotate-ccw.svg">icons/rotate-ccw.svg</file>
         <file alias="icons/save.svg">icons/save.svg</file>
+        <file alias="icons/upload.svg">icons/upload.svg</file>
+        <file alias="icons/download.svg">icons/download.svg</file>
         <file alias="icons/settings-2.svg">icons/settings-2.svg</file>
         <file alias="icons/shuffle.svg">icons/shuffle.svg</file>
         <file alias="icons/sliders-horizontal.svg">icons/sliders-horizontal.svg</file>

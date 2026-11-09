@@ -1,5 +1,5 @@
 pkgname=omaglow
-pkgver=0.27.2
+pkgver=0.28.0
 pkgrel=1
 pkgdesc='Lighting and settings for the ROG Azoth keyboard, Razer DeathAdder V2 mouse and ASUS Aura laptops'
 arch=('x86_64' 'aarch64')

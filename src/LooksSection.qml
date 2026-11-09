@@ -8,7 +8,7 @@ Section {
     id: section
     icon: "bookmark"
     title: qsTr("Looks")
-    note: qsTr("Save the lighting you have now with a name.")
+    note: qsTr("Save the lighting you have now with a name. Export a look to a file to keep it or share it, and import files exported from Omaglow.")
 
     RowLayout {
         Layout.fillWidth: true
@@ -36,6 +36,19 @@ Section {
             enabled: nameField.text.trim().length > 0
             onClicked: nameField.save()
         }
+        Button { text: qsTr("Import"); icon.source: "qrc:/icons/upload.svg"; flat: true; onClicked: backend.importLook() }
+    }
+
+    // What the last export or import did; it fades after a few seconds.
+    Label {
+        id: notice
+        visible: text.length > 0
+        color: theme.accent
+        Connections {
+            target: backend
+            function onLookNoticeChanged() { notice.text = backend.lookNotice; noticeTimer.restart() }
+        }
+        Timer { id: noticeTimer; interval: 4000; onTriggered: notice.text = "" }
     }
 
     Label {
@@ -57,6 +70,7 @@ Section {
                 text: !modelData.on ? qsTr("Off") : modelData.custom ? qsTr("Custom") : backend.effects[modelData.effect].name
             }
             Button { text: qsTr("Apply"); icon.source: "qrc:/icons/check.svg"; flat: true; onClicked: backend.applyLook(index) }
+            Button { text: qsTr("Export"); icon.source: "qrc:/icons/download.svg"; flat: true; onClicked: backend.exportLook(index) }
             Button {
                 text: qsTr("Delete"); icon.source: "qrc:/icons/trash-2.svg"
                 flat: true
