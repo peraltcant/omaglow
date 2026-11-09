@@ -704,6 +704,17 @@ private slots:
         // Two beats per cycle: the space bar flares again after the first ring.
         QVERIFY(at(600 + 30).value(space).value() > at(450).value(space).value());
 
+        // The blend adds light as light adds up: gold over blue at half
+        // strength is a bright pale color, not a dim grey.
+        for (const auto &k : Keymap::layout())
+            lighting.keys.insert(k.code, QColor("#0000ff"));
+        lighting.layers[0].color2 = QColor("#ffff00");
+        const QColor flash = at(30).value(esc);
+        QVERIFY2(flash.red() > 170 && flash.green() > 170, qPrintable(flash.name()));
+        for (const auto &k : Keymap::layout())
+            lighting.keys.insert(k.code, under);
+        lighting.layers[0].color2 = QColor("#ff0000");
+
         // Embers: a few sparks over the keys, the rest showing what is under,
         // and over a cycle they reach the bottom and the top rows.
         lighting.layers[0].effect = Design::Embers;

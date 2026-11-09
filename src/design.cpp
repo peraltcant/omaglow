@@ -42,6 +42,19 @@ QColor mixed(const QColor &a, const QColor &b, double f) {
                   qRound(a.blue() + (b.blue() - a.blue()) * f));
 }
 
+// Light added over a color, mixed as light mixes (in linear light, gamma
+// 2.2 as the keyboard is driven): half gold over blue is a pale bright color,
+// where mixing the numbers would give a dim grey.
+QColor lit(const QColor &under, const QColor &light, double f) {
+    f = qBound(0.0, f, 1.0);
+    auto channel = [f](int a, int b) {
+        const double la = std::pow(a / 255.0, 2.2), lb = std::pow(b / 255.0, 2.2);
+        return qRound(255 * std::pow(la + (lb - la) * f, 1 / 2.2));
+    };
+    return QColor(channel(under.red(), light.red()), channel(under.green(), light.green()),
+                  channel(under.blue(), light.blue()));
+}
+
 QColor hue(double degrees) {
     const int h = int(std::floor(degrees)) % 360;
     return QColor::fromHsv(h < 0 ? h + 360 : h, 255, 255).toRgb();
@@ -324,7 +337,7 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             }
             if (glow <= 0.01)
                 continue;
-            c = mixed(out.value(code, QColor(0, 0, 0)), mixed(layer.color1, layer.color2, d / reach), glow);
+            c = lit(out.value(code, QColor(0, 0, 0)), mixed(layer.color1, layer.color2, d / reach), glow);
             break;
         }
         case Embers: {
@@ -354,7 +367,7 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             if (best <= 0.01)
                 continue;
             const QColor color = layer.randomColors ? hue(hashOf(spark, 3) % 360) : mixed(layer.color1, layer.color2, rise);
-            c = mixed(out.value(code, QColor(0, 0, 0)), color, best);
+            c = lit(out.value(code, QColor(0, 0, 0)), color, best);
             break;
         }
         case Notifications: {
