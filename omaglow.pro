@@ -4,6 +4,11 @@ CONFIG += c++17 release
 TARGET = omaglow
 TEMPLATE = app
 
+# The one place the version is written; the PKGBUILD's pkgver must match it
+# (bin/check-version, run in CI).
+OMAGLOW_VERSION = $$cat($$PWD/VERSION)
+DEFINES += OMAGLOW_VERSION=\\\"$$OMAGLOW_VERSION\\\"
+
 HEADERS += \
     src/live.h \
     src/backend.h \

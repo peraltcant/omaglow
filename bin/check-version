@@ -1,0 +1,13 @@
+#!/bin/sh
+# The VERSION file is the version; the PKGBUILD must say the same.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+version="$(tr -d '[:space:]' < "$ROOT/VERSION")"
+pkgver="$(sed -n 's/^pkgver=//p' "$ROOT/pkgbuild/PKGBUILD")"
+
+if [ "$version" != "$pkgver" ]; then
+    echo "VERSION says $version but pkgbuild/PKGBUILD says pkgver=$pkgver" >&2
+    exit 1
+fi
+echo "Version $version"
