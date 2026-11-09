@@ -1204,6 +1204,8 @@ QVariantMap Backend::laptopAura() const {
 }
 
 bool Backend::laptopAvailable() const {
+    if (m_laptopFinder)
+        return m_laptopFinder();
     return !QStandardPaths::findExecutable("asusctl").isEmpty();
 }
 

@@ -251,6 +251,9 @@ public:
     void setHooksDirectory(const QString &path) { m_hooksDirectory = path; }
     using AsusctlRunner = std::function<int(const QStringList &args)>;
     void setAsusctlRunner(AsusctlRunner runner) { m_asusctl = std::move(runner); }
+    // Whether the laptop keyboard can be driven (asusctl installed); for tests.
+    using LaptopFinder = std::function<bool()>;
+    void setLaptopFinder(LaptopFinder finder) { m_laptopFinder = std::move(finder); }
     int mouseStatus() const { return m_mouseStatus; }
     // Looks for the mouse again; the poll does this every couple of seconds.
     void refreshMouse();
@@ -396,6 +399,7 @@ private:
     void markNotResponding();
     Finder m_mouseFinder;
     AsusctlRunner m_asusctl;
+    LaptopFinder m_laptopFinder;
     bool m_followTheme = false;
     QString m_hooksDirectory;
     bool m_hasLaptop = false; // set once the laptop keyboard was picked here

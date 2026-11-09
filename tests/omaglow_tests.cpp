@@ -1996,6 +1996,7 @@ private slots:
         auto backend = makeBackend(dir, &link);
         backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
         QList<QStringList> ran;
+        backend->setLaptopFinder([] { return true; });
         backend->setAsusctlRunner([&](const QStringList &args) { ran.append(args); return 0; });
         backend->setLaptopAura(Laptop::Breathe, QColor("#0050ff"), QColor("#ffb000"), 1, 3, 3);
         QCOMPARE(ran.size(), 2);
@@ -2043,6 +2044,7 @@ private slots:
         auto backend = makeBackend(dir, &link);
         backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
         QList<QStringList> ran;
+        backend->setLaptopFinder([] { return true; });
         backend->setAsusctlRunner([&](const QStringList &args) { ran.append(args); return 0; });
         FakeFeaturePort port;
         backend->setMouseOpener([&]() -> Razer::FeaturePort * { return new ForwardingPort(&port); });
@@ -2071,6 +2073,7 @@ private slots:
         QVERIFY(!link->sent.isEmpty());
         QCOMPARE(port.sent.size(), 4); // logo and wheel: effect and brightness each
         QCOMPARE(port.sent[0], Razer::effect(Razer::Logo, {Razer::Static, QColor("#7aa2f7")}));
+        QVERIFY2(!ran.isEmpty(), "asusctl was never run for the laptop keyboard");
         QCOMPARE(ran.first(), (QStringList{"aura", "effect", "static", "-c", "7aa2f7"}));
 
         // The same color again changes nothing (the keyboard stores each effect).
