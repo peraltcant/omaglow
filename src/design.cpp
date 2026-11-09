@@ -215,13 +215,17 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             break;
         }
         case Workspaces: {
-            // Number keys only: 1-9, and 0 for workspace 10.
+            // Number keys only: 1-9, and 0 for the tenth. Omarchy gives each
+            // monitor a block of ten workspaces (11-20 for the second), and
+            // Super + 1-0 goes to the focused monitor's; the keys follow it too.
             bool number = false;
             int workspace = QString::fromUtf8(Keymap::find(code)->label).toInt(&number);
             if (!number)
                 continue;
             if (workspace == 0)
                 workspace = 10;
+            if (live.activeWorkspace > 0)
+                workspace += (live.activeWorkspace - 1) / 10 * 10;
             c = workspace == live.activeWorkspace         ? layer.color2
                 : live.busyWorkspaces.contains(workspace) ? layer.color1
                                                           : QColor(0, 0, 0);

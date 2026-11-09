@@ -48,7 +48,8 @@ stored on the keyboard and survive reboots and other computers.
 - Live layers that show what is going on:
   - Music: spectrum bars from the default audio output (`parec`).
   - Workspaces: on the number keys, Hyprland workspaces with windows in one
-    color and the active one in another.
+    color and the active one in another, for the focused monitor's block of
+    ten (Omarchy gives each monitor its own 1-10).
   - Meter: CPU load, CPU temperature or the laptop's battery as a bar.
   - Notifications: the keys blink when a notification comes (`dbus-monitor`;
     only that one came is used).

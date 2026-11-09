@@ -452,6 +452,14 @@ private slots:
         QCOMPARE(frame.value(three), QColor("#ff0000"));
         QCOMPARE(frame.value(esc), QColor("#123456"));
         QCOMPARE(Design::liveNeeds(lighting), int(Design::NeedsWorkspaces));
+        // Omarchy gives each monitor a block of ten (11-20 for the second one):
+        // the keys follow the focused monitor's block, as Super + 1-0 does.
+        live.busyWorkspaces = {1, 11, 13};
+        live.activeWorkspace = 11;
+        const Design::Keys second = Design::render(lighting, 0, live);
+        QCOMPARE(second.value(one), QColor("#ff0000"));
+        QCOMPARE(second.value(two), QColor(0, 0, 0));
+        QCOMPARE(second.value(three), QColor("#00ff00"));
 
         // Hyprland's replies: special workspaces (negative ids) and empty ones don't count.
         QCOMPARE(LiveFeed::busyWorkspaces(R"([{"id":1,"windows":2},{"id":2,"windows":0},{"id":-98,"windows":1},{"id":10,"windows":1}])"),
