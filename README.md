@@ -44,7 +44,7 @@ stored on the keyboard and survive reboots and other computers.
   (Static, Breathing, Strobing, Color cycle, Rainbow, Starry night, Comet,
   Tide, Current, and Omaglow's Fire, Plasma, Scanner, Fireflies, Heartbeat
   and Gradient) in one color, two colors or random colors, drawn over the
-  design, layers to the right on top. Shockwave (rings from the bottom row on
+  design, layers to the right on top. Shockwave (a drum flash and rings from the bottom row on
   a double beat) and Embers (sparks rising) blend over the layers under them
   instead of covering them.
 - Live layers that show what is going on:

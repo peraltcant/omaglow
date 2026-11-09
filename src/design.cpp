@@ -311,11 +311,16 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             double glow = 0;
             const double starts[] = {0.0, 0.2}, strengths[] = {1.0, 0.7};
             for (int b = 0; b < 2; ++b) {
-                const double p = (t - starts[b]) / 0.45;
+                // The drum: the whole layer flashes at once and fades fast.
+                const double since = t - starts[b];
+                if (since >= 0 && since < 0.1)
+                    glow = qMax(glow, strengths[b] * 0.6 * (1 - since / 0.1));
+                // The wave: a wide ring that keeps its strength most of the way.
+                const double p = since / 0.45;
                 if (p < 0 || p >= 1)
                     continue;
-                const double ring = qMax(0.0, 1 - std::abs(d - p * reach) / 1.3);
-                glow = qMax(glow, strengths[b] * ring * (1 - p));
+                const double ring = qMax(0.0, 1 - std::abs(d - p * reach) / 1.8);
+                glow = qMax(glow, strengths[b] * ring * std::pow(1 - p, 0.4));
             }
             if (glow <= 0.01)
                 continue;

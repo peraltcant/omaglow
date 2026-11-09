@@ -688,11 +688,13 @@ private slots:
         const int esc = 0x6e, space = 0x3d;
         auto at = [&](qint64 ms) { return Design::render(lighting, ms); };
 
-        // A beat starts at the space bar, bright, while far keys still show
-        // what is under the layer; the ring reaches Esc later; between beats
-        // everything shows the layer under it.
+        // A beat flashes the whole layer at once, like a drum, the space bar
+        // brightest, and a ring leaves the space bar; it reaches Esc later;
+        // between beats everything shows the layer under it.
         QVERIFY(at(30).value(space).value() > 200);
-        QCOMPARE(at(30).value(esc), under);
+        QVERIFY(at(30).value(esc).value() > under.value() + 40);
+        QVERIFY(at(30).value(esc).value() < at(30).value(space).value());
+        QCOMPARE(at(450).value(esc), under); // the flash is over, the ring not there yet
         bool escReached = false;
         for (qint64 ms = 0; ms < 1500; ms += 30)
             escReached |= at(ms).value(esc) != under;
