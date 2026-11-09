@@ -205,6 +205,11 @@ output of `makepkg -g` in `sha256sums` and run
 `pkgbuild/PKGBUILD` builds this checkout (`bin/install`); `aur/PKGBUILD` builds
 a released tag from GitHub, for the AUR.
 
+`bin/protect-github --apply` sets GitHub rulesets once the repository is
+public: `main` can't be deleted or force-pushed and takes only commits whose CI
+build passed (push the branch, wait for the check, then fast-forward `main`),
+and `v*` tags can't be deleted or moved. Without `--apply` it only shows them.
+
 The protocol was reverse engineered from Armoury Crate USB captures; the packet
 builders in `src/protocol.cpp` are tested against the captured bytes.
 Hardware macros don't exist on firmware 4.00.18, and the keyboard can't report

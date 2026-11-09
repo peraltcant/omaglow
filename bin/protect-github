@@ -1,0 +1,82 @@
+#!/bin/sh
+# Rules on GitHub that keep main and the release tags safe. GitHub enforces
+# them only on public repositories (or with GitHub Pro), so run this after
+# making the repository public.
+#
+#   bin/protect-github           shows the rules it would set
+#   bin/protect-github --apply   creates them, or updates them if they exist
+#
+# main: no deleting, no force-pushing, linear history, and a commit gets in
+# only after the CI's build job passed on it (push the branch first, then
+# fast-forward main to it). Tags v*: no deleting or moving them.
+set -eu
+
+apply=false
+case "${1:-}" in
+    --apply) apply=true ;;
+    "") ;;
+    *) echo "usage: bin/protect-github [--apply]" >&2; exit 2 ;;
+esac
+
+main_rules='{
+  "name": "Protect main",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "required_linear_history"},
+    {"type": "required_status_checks", "parameters": {
+      "strict_required_status_checks_policy": false,
+      "required_status_checks": [{"context": "build"}]}}
+  ]
+}'
+
+tag_rules='{
+  "name": "Protect release tags",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "update", "parameters": {"update_allows_fetch_and_merge": false}}
+  ]
+}'
+
+if ! $apply; then
+    echo "Would set these rulesets (run with --apply):"
+    echo "$main_rules"
+    echo "$tag_rules"
+    exit 0
+fi
+
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+visibility="$(gh repo view --json visibility --jq .visibility)"
+if [ "$visibility" != "PUBLIC" ]; then
+    echo "$repo is $visibility: GitHub enforces rulesets only on public repositories (or with GitHub Pro)." >&2
+    exit 1
+fi
+
+# Creates the ruleset, or replaces the one with the same name.
+set_ruleset() {
+    name="$(printf '%s' "$1" | sed -n 's/^  "name": "\(.*\)",$/\1/p')"
+    id="$(gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"
+    if [ -n "$id" ]; then
+        printf '%s' "$1" | gh api --method PUT "repos/$repo/rulesets/$id" --input - --jq '"updated \(.name) (\(.id))"'
+    else
+        printf '%s' "$1" | gh api --method POST "repos/$repo/rulesets" --input - --jq '"created \(.name) (\(.id))"'
+    fi
+}
+
+set_ruleset "$main_rules"
+set_ruleset "$tag_rules"
+
+# Read back what GitHub kept, so a pattern it didn't take shows here.
+gh api "repos/$repo/rulesets" --jq '.[].id' | while read -r id; do
+    gh api "repos/$repo/rulesets/$id" \
+        --jq '"\(.name): \(.enforcement), \(.conditions.ref_name.include | join(", ")): \([.rules[].type] | join(", "))"'
+done

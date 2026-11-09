@@ -5,6 +5,7 @@ Each version's changes, newest first. The version is in `VERSION`.
 ## Unreleased
 
 - A PKGBUILD for the AUR in `aur/`, building a released tag.
+- `bin/protect-github` sets GitHub rulesets for `main` and the release tags.
 - The README says Omaglow isn't affiliated with ASUS or Razer and never writes
   firmware, and shows the current app.
 
