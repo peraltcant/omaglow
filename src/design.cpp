@@ -288,6 +288,70 @@ void drawLayer(const Layer &layer, qint64 ms, const Live &live, Keys &out) {
             c = scaled(color, best);
             break;
         }
+        case Shockwave: {
+            // Two beats per cycle, as Heartbeat's, each sending a ring from the
+            // bottom middle of the layer (the space bar, on the whole keyboard)
+            // to its edges, blended over what is under it.
+            // The origin: the bottom row key under the middle of the layer.
+            const double middle = (minX + maxX) / 2;
+            double ox = middle, nearest = 1e9;
+            for (int other : keys) {
+                const Keymap::Key *k = Keymap::find(other);
+                if (k->y != maxY)
+                    continue;
+                const double away = middle >= k->x && middle < k->x + k->width ? 0 : std::abs(centerOf(other) - middle);
+                if (away < nearest) {
+                    nearest = away;
+                    ox = centerOf(other);
+                }
+            }
+            const double y = Keymap::find(code)->y;
+            const double reach = std::hypot(qMax(ox - minX, maxX - ox), maxY - minY) + 1;
+            const double d = std::hypot(x - ox, y - maxY);
+            double glow = 0;
+            const double starts[] = {0.0, 0.2}, strengths[] = {1.0, 0.7};
+            for (int b = 0; b < 2; ++b) {
+                const double p = (t - starts[b]) / 0.45;
+                if (p < 0 || p >= 1)
+                    continue;
+                const double ring = qMax(0.0, 1 - std::abs(d - p * reach) / 1.3);
+                glow = qMax(glow, strengths[b] * ring * (1 - p));
+            }
+            if (glow <= 0.01)
+                continue;
+            c = mixed(out.value(code, QColor(0, 0, 0)), mixed(layer.color1, layer.color2, d / reach), glow);
+            break;
+        }
+        case Embers: {
+            // Sparks born at the bottom drift up, swaying, and fade on the way;
+            // each on its own clock, a new column every time it is born.
+            const double y = Keymap::find(code)->y;
+            const int count = qMax(3, int(keys.size()) / 8);
+            double best = 0, rise = 0;
+            int spark = 0;
+            for (int i = 0; i < count; ++i) {
+                const quint32 h = hashOf(i, 7);
+                const qint64 life = period * (80 + h % 40) / 100;
+                const qint64 local = ms + h % life;
+                const qint64 born = local / life;
+                const double p = double(local % life) / life;
+                const double column = minX + (hashOf(i, born) % 1000) / 999.0 * (maxX - minX);
+                const double sx = column + 0.5 * std::sin(2 * M_PI * (p + i * 0.37));
+                const double sy = maxY - p * (maxY - minY + 0.5);
+                const double near = 1 - std::hypot(x - sx, (y - sy) * 1.3) / 0.9;
+                const double glow = near * std::pow(1 - p, 0.7);
+                if (glow > best) {
+                    best = glow;
+                    rise = p;
+                    spark = i;
+                }
+            }
+            if (best <= 0.01)
+                continue;
+            const QColor color = layer.randomColors ? hue(hashOf(spark, 3) % 360) : mixed(layer.color1, layer.color2, rise);
+            c = mixed(out.value(code, QColor(0, 0, 0)), color, best);
+            break;
+        }
         case Notifications: {
             // Four blinks over two seconds, the colors taking turns; otherwise
             // the keys show what is under the layer.

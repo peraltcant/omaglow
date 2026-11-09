@@ -670,6 +670,57 @@ private slots:
         QCOMPARE(LiveFeed::keyboardInputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw5", "/dev/hidraw9"}));
     }
 
+    void shockwaveAndEmbersBlendOverTheLayersUnder()
+    {
+        Design::ProfileLighting lighting;
+        lighting.custom = true;
+        const QColor under("#400000");
+        for (const auto &k : Keymap::layout())
+            lighting.keys.insert(k.code, under);
+        Design::Layer layer;
+        layer.color1 = QColor("#ffff00");
+        layer.color2 = QColor("#ff0000");
+        layer.speed = 1; // a 3 second cycle
+        for (const auto &k : Keymap::layout())
+            layer.keys.append(k.code);
+        layer.effect = Design::Shockwave;
+        lighting.layers = {layer};
+        const int esc = 0x6e, space = 0x3d;
+        auto at = [&](qint64 ms) { return Design::render(lighting, ms); };
+
+        // A beat starts at the space bar, bright, while far keys still show
+        // what is under the layer; the ring reaches Esc later; between beats
+        // everything shows the layer under it.
+        QVERIFY(at(30).value(space).value() > 200);
+        QCOMPARE(at(30).value(esc), under);
+        bool escReached = false;
+        for (qint64 ms = 0; ms < 1500; ms += 30)
+            escReached |= at(ms).value(esc) != under;
+        QVERIFY(escReached);
+        for (const auto &k : Keymap::layout())
+            QCOMPARE(at(2700).value(k.code), under);
+        // Two beats per cycle: the space bar flares again after the first ring.
+        QVERIFY(at(600 + 30).value(space).value() > at(450).value(space).value());
+
+        // Embers: a few sparks over the keys, the rest showing what is under,
+        // and over a cycle they reach the bottom and the top rows.
+        lighting.layers[0].effect = Design::Embers;
+        int lit = 0;
+        for (const QColor &c : at(1000))
+            lit += c != under;
+        QVERIFY(lit > 0 && lit < Keymap::layout().size() / 3);
+        bool bottom = false, top = false;
+        for (qint64 ms = 0; ms < 6000; ms += 50) {
+            const Design::Keys frame = at(ms);
+            bottom |= frame.value(space) != under;
+            top |= frame.value(esc) != under || frame.value(0x70) != under || frame.value(0x75) != under;
+        }
+        QVERIFY(bottom && top);
+        QCOMPARE(at(1234), at(1234));
+        QCOMPARE(Design::liveNeeds(lighting), 0);
+        QVERIFY(Design::animated(lighting));
+    }
+
     void layerEffectsMoveOverTime()
     {
         Design::ProfileLighting lighting;

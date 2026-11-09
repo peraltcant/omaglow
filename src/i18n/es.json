@@ -250,5 +250,7 @@
   "Done": "Terminado",
   "%1 left": "Quedan %1",
   "The timer keys go dark one by one, the rightmost first, then blink when the time is up.": "Las teclas del temporizador se apagan una por una, empezando por la derecha, y parpadean cuando se acaba el tiempo.",
-  "%1 min": "%1 min"
+  "%1 min": "%1 min",
+  "Shockwave": "Onda de choque",
+  "Embers": "Brasas"
 }

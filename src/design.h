@@ -38,6 +38,8 @@ enum LayerEffect {
     Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
     // Live ones, drawn from what the lights service gathers (Live below).
     Music, Workspaces, Meter, Notifications, Timer, Typing,
+    // Drawn over the layers under them rather than covering them.
+    Shockwave, Embers,
     LayerEffectCount
 };
 

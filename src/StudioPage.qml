@@ -16,16 +16,21 @@ ScrollView {
     // Effects that use the colors, and the ones where random colors make sense.
     // By effect: Static, Breathing, Strobing, Color cycle, Rainbow, Starry night,
     // Comet, Tide, Current, Fire, Plasma, Scanner, Fireflies, Heartbeat, Gradient,
-    // then the live ones: Music, Workspaces, Meter, Notifications, Timer, Typing.
+    // then the live ones: Music, Workspaces, Meter, Notifications, Timer, Typing,
+    // then Shockwave and Embers.
     readonly property var usesColors: [true, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true, true,
+                                       true, true]
     readonly property var usesSecond: [false, true, true, false, false, true, true, true, true,
-                                       true, true, true, true, true, true, true, true, true, true, true, true]
+                                       true, true, true, true, true, true, true, true, true, true, true, true,
+                                       true, true]
     readonly property var usesRandom: [false, true, true, false, false, true, true, false, true,
-                                       false, true, false, true, false, false, false, false, false, false, false, true]
+                                       false, true, false, true, false, false, false, false, false, false, false, true,
+                                       false, true]
     // Still effects, and live ones that follow their source, have no speed.
     readonly property var usesSpeed: [false, true, true, true, true, true, true, true, true,
-                                      true, true, true, true, true, false, false, false, false, false, false, true]
+                                      true, true, true, true, true, false, false, false, false, false, false, true,
+                                      true, true]
     readonly property int meterEffect: 17
     readonly property int timerEffect: 19
     readonly property int typingEffect: 20
