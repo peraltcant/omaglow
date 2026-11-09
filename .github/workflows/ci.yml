@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    # The app is built for Arch (Omarchy), so it is checked on Arch with
+    # Arch's Qt 6.
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build tools and Qt 6
+        run: pacman -Syu --noconfirm --needed base-devel git qt6-base qt6-declarative qt6-svg
+
+      - uses: actions/checkout@v4
+
+      - name: Check the version
+        run: bin/check-version
+
+      - name: Build the app
+        run: bin/build
+
+      - name: Build and run the tests
+        run: bin/test
