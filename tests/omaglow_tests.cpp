@@ -100,7 +100,11 @@ public:
 class FakePicker : public FilePicker {
 public:
     int opened = 0;
+    int lookOpens = 0;
+    QString savedName; // the name offered for a look being saved
     void openImage() override { ++opened; }
+    void openLook() override { ++lookOpens; }
+    void saveLook(const QString &name) override { savedName = name; }
 };
 
 static QByteArray hex(const char *text)
@@ -2369,6 +2373,63 @@ private slots:
         // A timer layer without keys draws nothing, so it gets no control.
         backend->setLayerKeys(index, {0x02, 0x03}, false);
         QCOMPARE(backend->timerMinutes(), 0);
+    }
+
+    void looksAreExportedAndImportedAsFiles()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        FakePicker *picker = nullptr;
+        auto backend = makeBackend(dir, &link, &picker);
+        backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
+        const int layer = backend->addLayer("Glow");
+        backend->setLayerEffect(layer, Design::Embers);
+        backend->setLayerKeys(layer, {0x3d}, true);
+        backend->saveLook("War band");
+        QCOMPARE(backend->looks().size(), 1);
+
+        // Export: the save dialog offers the look's name, then the file holds it.
+        backend->exportLook(0);
+        QCOMPARE(picker->savedName, QString("War band.json"));
+        const QString path = dir.path() + "/war-band.json";
+        emit picker->lookSaveChosen(QUrl::fromLocalFile(path));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QJsonObject json = QJsonDocument::fromJson(file.readAll()).object();
+        QCOMPARE(json.value("name").toString(), QString("War band"));
+        QCOMPARE(backend->lookNotice(), QString("Exported War band."));
+        // An index out of range opens nothing.
+        picker->savedName.clear();
+        backend->exportLook(5);
+        QVERIFY(picker->savedName.isEmpty());
+
+        // Import: the same name becomes "War band (2)", with the same lighting.
+        backend->importLook();
+        QCOMPARE(picker->lookOpens, 1);
+        emit picker->lookOpened(QUrl::fromLocalFile(path));
+        QCOMPARE(backend->looks().size(), 2);
+        QCOMPARE(backend->looks().at(1).toMap().value("name").toString(), QString("War band (2)"));
+        QCOMPARE(backend->lookNotice(), QString("Imported War band (2)."));
+        emit picker->lookOpened(QUrl::fromLocalFile(path));
+        QCOMPARE(backend->looks().at(2).toMap().value("name").toString(), QString("War band (3)"));
+
+        // Kept like any look: still there for the next start.
+        QSettings settings(dir.path() + "/settings.ini", QSettings::IniFormat);
+        QCOMPARE(Design::loadLooks(settings).size(), 3);
+        QCOMPARE(Design::encodeLayers(Design::loadLooks(settings).at(1).lighting.layers),
+                 Design::encodeLayers(Design::loadLooks(settings).at(0).lighting.layers));
+
+        // A file that isn't a look is refused and changes nothing.
+        const QString other = dir.path() + "/notes.json";
+        QFile notes(other);
+        QVERIFY(notes.open(QIODevice::WriteOnly));
+        notes.write(R"({"hello": "world"})");
+        notes.close();
+        emit picker->lookOpened(QUrl::fromLocalFile(other));
+        QCOMPARE(backend->looks().size(), 3);
+        QCOMPARE(backend->error(), QString("Couldn't import notes.json: This file isn't an Omaglow look."));
+        emit picker->lookOpened(QUrl::fromLocalFile(dir.path() + "/missing.json"));
+        QVERIFY(backend->error().startsWith("Couldn't import missing.json"));
     }
 
     void lightServicePacesItsReports()

@@ -5,8 +5,10 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
 #include <QProcess>
 #include <QRandomGenerator>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -72,6 +74,8 @@ Backend::Backend(Finder finder, Opener opener, QSettings *settings, FilePicker *
     };
     connect(m_picker, &FilePicker::openSelected, this, [this](const QUrl &url) { uploadOled(url.toLocalFile()); });
     connect(m_picker, &FilePicker::failed, this, &Backend::setError);
+    connect(m_picker, &FilePicker::lookOpened, this, &Backend::readLookFile);
+    connect(m_picker, &FilePicker::lookSaveChosen, this, &Backend::writeLookFile);
 
     // Sliders change many times a second; send the last value once they rest.
     m_lightingTimer.setSingleShot(true);
@@ -1360,4 +1364,63 @@ void Backend::stopTimer() {
     m_settings->remove("timer/startedAt");
     m_settings->sync();
     emit timerChanged();
+}
+
+void Backend::setLookNotice(const QString &notice) {
+    m_lookNotice = notice;
+    emit lookNoticeChanged();
+}
+
+void Backend::exportLook(int index) {
+    if (index < 0 || index >= m_looks.size())
+        return;
+    m_exporting = index;
+    m_picker->saveLook(m_looks[index].name + ".json");
+}
+
+void Backend::writeLookFile(const QUrl &url) {
+    const int index = m_exporting;
+    m_exporting = -1;
+    if (index < 0 || index >= m_looks.size())
+        return;
+    const QString path = url.toLocalFile();
+    QSaveFile file(path);
+    const QByteArray bytes = QJsonDocument(Design::lookToJson(m_looks[index])).toJson(QJsonDocument::Indented);
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+        setError(tr("Couldn't export to %1: %2").arg(QFileInfo(path).fileName(), file.errorString()));
+        return;
+    }
+    setLookNotice(tr("Exported %1.").arg(m_looks[index].name));
+}
+
+void Backend::importLook() {
+    m_picker->openLook();
+}
+
+void Backend::readLookFile(const QUrl &url) {
+    const QString path = url.toLocalFile();
+    const QString fileName = QFileInfo(path).fileName();
+    QFile file(path);
+    // A look is a few kilobytes; anything far bigger isn't one.
+    constexpr qint64 maxBytes = 1024 * 1024;
+    if (!file.open(QIODevice::ReadOnly)) {
+        setError(tr("Couldn't import %1: %2").arg(fileName, file.errorString()));
+        return;
+    }
+    if (file.size() > maxBytes) {
+        setError(tr("Couldn't import %1: %2").arg(fileName, tr("The file is too big to be a look.")));
+        return;
+    }
+    QString why;
+    std::optional<Design::Look> look = Design::lookFromJson(file.readAll(), &why);
+    if (!look) {
+        setError(tr("Couldn't import %1: %2").arg(fileName, why));
+        return;
+    }
+    const QString base = look->name;
+    for (int n = 2; Design::findLook(m_looks, look->name) >= 0; ++n)
+        look->name = QString("%1 (%2)").arg(base).arg(n);
+    m_looks.append(*look);
+    storeLooks();
+    setLookNotice(tr("Imported %1.").arg(look->name));
 }

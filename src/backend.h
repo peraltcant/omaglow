@@ -77,6 +77,8 @@ class Backend : public QObject {
     Q_PROPERTY(int profile READ profile WRITE setProfile NOTIFY profileChanged)
     // Saved lightings, each {name, custom, effect}.
     Q_PROPERTY(QVariantList looks READ looks NOTIFY looksChanged)
+    // What the last export or import did, for the Looks section.
+    Q_PROPERTY(QString lookNotice READ lookNotice NOTIFY lookNoticeChanged)
     // The Razer mouse's lighting by LED ("4" logo, "1" scroll wheel):
     // {effect, color1, color2, twoColors, brightness}.
     Q_PROPERTY(QVariantMap mouseZones READ mouseZones NOTIFY mouseChanged)
@@ -168,6 +170,11 @@ public:
     // What some effects need besides colors: a meter's source (Design::MeterSource),
     // a timer's minutes (1-120).
     Q_INVOKABLE void setLayerOption(int index, int option);
+    // Look files: export asks where to save the look at index; import asks
+    // for a file and adds its look, renamed "Name (2)" if the name is taken.
+    Q_INVOKABLE void exportLook(int index);
+    Q_INVOKABLE void importLook();
+    QString lookNotice() const { return m_lookNotice; }
     bool timerRunning() const;
     Q_INVOKABLE void startTimer();
     Q_INVOKABLE void stopTimer();
@@ -302,6 +309,7 @@ signals:
     void powerChanged();
     void profileChanged();
     void looksChanged();
+    void lookNoticeChanged();
     void mouseChanged();
     void laptopChanged();
     void followThemeChanged();
@@ -325,6 +333,11 @@ private:
     std::unique_ptr<QSettings> m_ownedSettings;
     QSettings *m_settings;
     FilePicker *m_picker = nullptr;
+    void writeLookFile(const QUrl &url);
+    void readLookFile(const QUrl &url);
+    void setLookNotice(const QString &notice);
+    int m_exporting = -1; // the look waiting for the save dialog
+    QString m_lookNotice;
     std::unique_ptr<Link> m_link;
     DeviceNode m_node;
     int m_connection = Disconnected;

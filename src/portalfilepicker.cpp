@@ -91,6 +91,15 @@ PortalFileFilters imageFilters() {
     };
 }
 
+PortalFileFilter lookFilter() {
+    return {QStringLiteral("Omaglow looks"), {{1, QStringLiteral("application/json")}, {0, QStringLiteral("*.json")}}};
+}
+
+QString lookFolder() {
+    const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    return QDir(documents).exists() ? documents : QDir::homePath();
+}
+
 QString portalToken() {
     return QStringLiteral("omaglow_%1").arg(QRandomGenerator::global()->generate());
 }
@@ -121,6 +130,28 @@ void PortalFilePicker::openImage() {
     options.insert(QStringLiteral("current_filter"), QVariant::fromValue(imageFilter()));
 
     requestFile(QStringLiteral("OpenFile"), tr("Open Image or Animation"), options, Action::Open);
+}
+
+void PortalFilePicker::openLook() {
+    QVariantMap options;
+    options.insert(QStringLiteral("accept_label"), tr("Import"));
+    options.insert(QStringLiteral("modal"), true);
+    options.insert(QStringLiteral("multiple"), false);
+    options.insert(QStringLiteral("current_folder"), portalPathBytes(lookFolder()));
+    const PortalFileFilters filters{lookFilter(), {QStringLiteral("All files"), {{0, QStringLiteral("*")}}}};
+    options.insert(QStringLiteral("filters"), QVariant::fromValue(filters));
+    options.insert(QStringLiteral("current_filter"), QVariant::fromValue(lookFilter()));
+    requestFile(QStringLiteral("OpenFile"), tr("Import a look"), options, Action::OpenLook);
+}
+
+void PortalFilePicker::saveLook(const QString &name) {
+    QVariantMap options;
+    options.insert(QStringLiteral("accept_label"), tr("Export"));
+    options.insert(QStringLiteral("modal"), true);
+    options.insert(QStringLiteral("current_name"), name);
+    options.insert(QStringLiteral("current_folder"), portalPathBytes(lookFolder()));
+    options.insert(QStringLiteral("filters"), QVariant::fromValue(PortalFileFilters{lookFilter()}));
+    requestFile(QStringLiteral("SaveFile"), tr("Export a look"), options, Action::SaveLook);
 }
 
 bool PortalFilePicker::connectToRequestPath(const QString &path) {
@@ -229,6 +260,10 @@ void PortalFilePicker::handleResponse(uint response, const QVariantMap &results)
 
     if (action == Action::Open)
         emit openSelected(QUrl(uris.first()));
+    else if (action == Action::OpenLook)
+        emit lookOpened(QUrl(uris.first()));
+    else if (action == Action::SaveLook)
+        emit lookSaveChosen(QUrl(uris.first()));
 }
 
 void PortalFilePicker::clearPending() {

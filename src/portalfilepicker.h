@@ -13,6 +13,8 @@ public:
     explicit PortalFilePicker(QObject *parent = nullptr);
 
     void openImage() override;
+    void openLook() override;
+    void saveLook(const QString &name) override;
 
 private slots:
     void handleResponse(uint response, const QVariantMap &results);
@@ -20,7 +22,9 @@ private slots:
 private:
     enum class Action {
         None,
-        Open
+        Open,
+        OpenLook,
+        SaveLook
     };
 
     void requestFile(const QString &method, const QString &title,

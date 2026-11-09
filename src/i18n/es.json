@@ -255,5 +255,14 @@
   "Embers": "Brasas",
   "This file isn't an Omaglow look.": "Este archivo no es un estilo de Omaglow.",
   "This look was saved by a newer Omaglow.": "Este estilo se guardó con una versión más nueva de Omaglow.",
-  "The look has no name.": "El estilo no tiene nombre."
+  "The look has no name.": "El estilo no tiene nombre.",
+  "Import": "Importar",
+  "Export": "Exportar",
+  "Import a look": "Importar un estilo",
+  "Export a look": "Exportar un estilo",
+  "Couldn't export to %1: %2": "No se pudo exportar a %1: %2",
+  "Exported %1.": "Se exportó %1.",
+  "Couldn't import %1: %2": "No se pudo importar %1: %2",
+  "The file is too big to be a look.": "El archivo es demasiado grande para ser un estilo.",
+  "Imported %1.": "Se importó %1."
 }
