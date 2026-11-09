@@ -1033,8 +1033,14 @@ private slots:
         QCOMPARE(node.path, dev + "/hidraw5");
         QCOMPARE(node.productId, QString("1A83"));
 
-        QFile::setPermissions(dev + "/hidraw5", QFile::ReadOwner);
-        QCOMPARE(Discovery::find(sys, dev).status, DeviceNode::NoPermission);
+        // Root opens any file whatever its permissions (CI runs in a root
+        // container), so a missing permission can only be seen as a user.
+        if (::geteuid() != 0) {
+            QFile::setPermissions(dev + "/hidraw5", QFile::ReadOwner);
+            QCOMPARE(Discovery::find(sys, dev).status, DeviceNode::NoPermission);
+        } else {
+            qInfo("running as root: the missing permission case is checked as a user only");
+        }
 
         QTemporaryDir empty;
         QCOMPARE(Discovery::find(empty.path(), empty.path()).status, DeviceNode::NotFound);
