@@ -30,6 +30,9 @@ Keys decode(const QString &text);
 QString encode(const Keys &keys);
 
 // The whole keyboard, keys left out dark, colors scaled by brightness 0-100.
+// Every LED of the keyboard with its color as the keyboard takes it, keys not
+// given dark.
+QList<QPair<int, QColor>> leds(const Keys &keys, int brightness);
 QList<QByteArray> packets(const Keys &keys, int brightness);
 
 // What a layer does to its keys, the effects Aura Creator offers. The host

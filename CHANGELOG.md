@@ -4,6 +4,11 @@ Each version's changes, newest first. The version is in `VERSION`.
 
 ## Unreleased
 
+## 0.30.0
+
+- Moving layers run smoother: each frame sends only the keys that changed, so
+  streaming goes from about 7 frames a second to 9-15. The whole keyboard is
+  sent again every second.
 - CI on GitHub Actions: every push and pull request builds the app and runs the
   tests on Arch Linux, and checks the PKGBUILD's version.
 - One version source, the `VERSION` file.

@@ -49,6 +49,7 @@ private:
     QElapsedTimer m_clock;
     qint64 m_lastReport = -1; // when the last report went out, on m_clock
     qint64 m_startedAt = -1; // when the color cycle step was last sent
+    QHash<int, QRgb> m_shown; // what each LED was last sent, empty when unknown
     Design::ProfileLighting m_streamed;
     QFileSystemWatcher m_watcher;
     LiveFeed m_live; // what live layers show, gathered while they are shown

@@ -534,7 +534,7 @@ static int toLed(int value, int brightness) {
     return table[qBound(0, value, 255)] * brightness / 100;
 }
 
-QList<QByteArray> packets(const Keys &keys, int brightness) {
+QList<QPair<int, QColor>> leds(const Keys &keys, int brightness) {
     const int b = qBound(0, brightness, 100);
     QHash<int, QColor> byLed;
     for (const auto &k : Keymap::layout()) {
@@ -547,7 +547,11 @@ QList<QByteArray> packets(const Keys &keys, int brightness) {
             const int led = column * 8 + row;
             leds.append({led, byLed.value(led, QColor(0, 0, 0))});
         }
-    return Protocol::directFrame(leds);
+    return leds;
+}
+
+QList<QByteArray> packets(const Keys &keys, int brightness) {
+    return Protocol::directFrame(leds(keys, brightness));
 }
 
 ProfileLighting load(QSettings &s, int profile) {

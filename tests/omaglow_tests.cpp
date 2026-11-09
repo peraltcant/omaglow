@@ -1828,8 +1828,8 @@ private slots:
         QVERIFY(sent[0].startsWith(raw("512c02001f6400ffff")));
         QVERIFY(sent[1].startsWith(raw("c0816000")));
         QTRY_VERIFY(sent.size() >= 22); // frames keep coming
-        for (const QByteArray &packet : sent.mid(1, 21))
-            QVERIFY(packet.startsWith(raw("c081")));
+        for (const QByteArray &packet : sent.mid(1, 21)) // with the step each second
+            QVERIFY(packet.startsWith(raw("c081")) || packet == Protocol::directStart());
         // Other commands (the app's battery check) put the keyboard back to
         // drawing one frame, so the step is repeated while streaming.
         sent.clear();
@@ -2514,6 +2514,67 @@ private slots:
         for (int i = 1; i < 16; ++i)
             QVERIFY2(times[i] - times[i - 1] >= LightService::ReportGapMs - 2,
                      qPrintable(QString("reports %1 and %2 were %3 ms apart").arg(i - 1).arg(i).arg(times[i] - times[i - 1])));
+    }
+
+    void lightServiceSendsOnlyTheKeysThatChange()
+    {
+        // Every report takes 20 ms, so a whole keyboard (8 reports) holds a
+        // frame to about 7 a second; sending the keys that changed lets small
+        // effects run at the frame rate. A whole frame follows each color
+        // cycle step, so a lost report heals within a second.
+        QTemporaryDir dir;
+        auto *settings = new QSettings(dir.path() + "/settings.ini", QSettings::IniFormat);
+        settings->setValue("device/profile", 1);
+        Design::ProfileLighting profile;
+        profile.custom = true;
+        Design::Layer layer;
+        layer.effect = Design::Breathing;
+        layer.speed = 0;
+        layer.color1 = QColor("#ffffff");
+        layer.keys = {0x12};
+        profile.layers = {layer};
+        Design::storeAt(*settings, "profile1/", profile);
+        settings->sync();
+        QList<QByteArray> sent;
+        LightService service([] { return DeviceNode{DeviceNode::Found, "/dev/null", "1A83"}; },
+                             [&](const QString &) -> Link * {
+                                 auto *l = new FakeLink;
+                                 l->log = &sent;
+                                 return l;
+                             },
+                             settings);
+        settings->setParent(&service);
+        service.tick();
+        const QByteArray start = Protocol::directStart();
+        QTRY_VERIFY_WITH_TIMEOUT(sent.count(start) >= 2 && sent.last() != start
+                                     && uchar(sent.last()[2]) <= Protocol::DirectLedsPerReport, 4000);
+
+        // Each frame as the LEDs it set, split at each color cycle step.
+        QList<QList<QList<int>>> steps;
+        QList<int> frame;
+        for (const QByteArray &packet : sent) {
+            if (packet == start) {
+                steps.append(QList<QList<int>>());
+                continue;
+            }
+            QVERIFY(Protocol::isDirect(packet));
+            const int left = uchar(packet[2]);
+            for (int i = 0; i < std::min(left, Protocol::DirectLedsPerReport); ++i)
+                frame.append(uchar(packet[4 + 4 * i]));
+            if (left <= Protocol::DirectLedsPerReport) {
+                steps.last().append(frame);
+                frame.clear();
+            }
+        }
+        QVERIFY(steps.size() >= 2);
+        int whole = 0;
+        for (const QByteArray &packet : Design::packets({}, 100))
+            whole += std::min(int(uchar(packet[2])), Protocol::DirectLedsPerReport);
+        QCOMPARE(int(steps[0][0].size()), whole);
+        QCOMPARE(int(steps[1][0].size()), whole);
+        QVERIFY2(steps[0].size() >= 4, qPrintable(QString("%1 frames in a second").arg(steps[0].size())));
+        for (int i = 1; i < steps[0].size(); ++i)
+            QCOMPARE(steps[0][i], QList<int>{Keymap::ledOf(0x12)});
     }
 
     void lightServiceWaitsWhileTheKeyboardSleeps()

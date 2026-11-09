@@ -14,6 +14,9 @@ constexpr int tickMs = 5000;
 // Other commands, like the app's battery check, put the keyboard back to
 // drawing a single frame; repeating the color cycle step this often heals it.
 constexpr qint64 restartMs = 1000;
+// An LED this close to what it shows isn't sent again: slow blends move every
+// LED a little each frame. The whole frame each restartMs settles them.
+constexpr int NearLed = 2;
 }
 
 LightService::LightService(QObject *parent)
@@ -122,18 +125,36 @@ void LightService::sendFrame() {
         if (!sendAll({Protocol::directStart()})) {
             m_frameTimer.stop();
             m_live.setNeeds(0);
+            m_shown.clear();
             return;
         }
         m_startedAt = now;
+        // The whole frame again after each step, so a lost report or the
+        // app's commands don't leave keys wrong for more than a second.
+        m_shown.clear();
     }
     Design::Live live = m_live.snapshot();
     live.timerStartedAt = m_timerStartedAt;
     live.now = QDateTime::currentMSecsSinceEpoch();
-    const QList<QByteArray> packets =
-        Design::packets(Design::render(m_streamed, m_clock.elapsed(), live), m_streamed.lighting.brightness);
+    // Only the LEDs that changed: each report takes ReportGapMs, so a whole
+    // keyboard per frame held streaming to about 7 frames a second.
+    QList<QPair<int, QColor>> changed;
+    for (const auto &[led, color] :
+         Design::leds(Design::render(m_streamed, m_clock.elapsed(), live), m_streamed.lighting.brightness)) {
+        const auto shown = m_shown.constFind(led);
+        if (shown == m_shown.cend() || qAbs(qRed(*shown) - color.red()) > NearLed
+            || qAbs(qGreen(*shown) - color.green()) > NearLed || qAbs(qBlue(*shown) - color.blue()) > NearLed)
+            changed.append({led, color});
+    }
+    if (changed.isEmpty())
+        return;
     // Try again from the next check, when the keyboard may be back.
-    if (!sendAll(packets)) {
+    if (!sendAll(Protocol::directFrame(changed))) {
         m_frameTimer.stop();
         m_live.setNeeds(0);
+        m_shown.clear();
+        return;
     }
+    for (const auto &[led, color] : changed)
+        m_shown.insert(led, color.rgb());
 }
