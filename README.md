@@ -183,9 +183,17 @@ not affiliated with or endorsed by either company.
 ## Develop
 
 ```sh
-bin/build   # build/omaglow
-bin/test    # Qt Test, offscreen
+bin/build           # build/omaglow
+bin/test            # Qt Test, offscreen
+bin/check-version   # VERSION and the PKGBUILD's pkgver agree
 ```
+
+CI (`.github/workflows/ci.yml`) runs these three on Arch Linux for every push
+and pull request.
+
+To release a version: write it in `VERSION` and in `pkgbuild/PKGBUILD`'s
+`pkgver`, move the Unreleased notes in `CHANGELOG.md` under it, and tag the
+commit `vX.Y.Z`.
 
 The protocol was reverse engineered from Armoury Crate USB captures; the packet
 builders in `src/protocol.cpp` are tested against the captured bytes.
