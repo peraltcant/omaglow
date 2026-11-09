@@ -11,6 +11,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QtConcurrent/QtConcurrentRun>
+#include <algorithm>
 
 #include "appinfo.h"
 #include "design.h"
@@ -1133,6 +1134,7 @@ QVariantList Backend::looks() const {
             {"on", look.lighting.on},
             {"effect", look.lighting.lighting.effect},
             {"active", Design::sameLook(look.lighting, current())},
+            {"favorite", look.favorite},
         });
     return list;
 }
@@ -1151,10 +1153,20 @@ void Backend::saveLook(const QString &name) {
     look.hasLaptop = m_hasLaptop;
     look.laptop = m_laptop;
     const int index = Design::findLook(m_looks, trimmed);
-    if (index >= 0)
+    if (index >= 0) {
+        look.favorite = m_looks[index].favorite; // saving over a look keeps its place
         m_looks[index] = look;
-    else
+    } else {
         m_looks.append(look);
+    }
+    storeLooks();
+}
+
+void Backend::setLookFavorite(int index, bool favorite) {
+    if (index < 0 || index >= m_looks.size())
+        return;
+    m_looks[index].favorite = favorite;
+    std::stable_partition(m_looks.begin(), m_looks.end(), [](const Design::Look &l) { return l.favorite; });
     storeLooks();
 }
 

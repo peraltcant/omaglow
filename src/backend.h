@@ -173,6 +173,8 @@ public:
     // Look files: export asks where to save the look at index; import asks
     // for a file and adds its look, renamed "Name (2)" if the name is taken.
     Q_INVOKABLE void exportLook(int index);
+    // Favorites are listed first; the order is stored, so indexes stay the list's.
+    Q_INVOKABLE void setLookFavorite(int index, bool favorite);
     Q_INVOKABLE void importLook();
     QString lookNotice() const { return m_lookNotice; }
     bool timerRunning() const;

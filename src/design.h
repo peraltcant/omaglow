@@ -131,6 +131,7 @@ struct Look {
     MouseZones mouse; // empty: the look leaves the mouse as it is
     bool hasLaptop = false; // false: the look leaves the laptop keyboard as it is
     Laptop::Aura laptop;
+    bool favorite = false;  // listed first; not part of a look file
 };
 QList<Look> loadLooks(QSettings &settings);
 void storeLooks(QSettings &settings, const QList<Look> &looks);

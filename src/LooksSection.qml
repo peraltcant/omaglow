@@ -63,6 +63,13 @@ Section {
             required property int index
             Layout.fillWidth: true
             spacing: 8
+            ToolButton {
+                icon.source: modelData.favorite ? "qrc:/icons/star-filled.svg" : "qrc:/icons/star.svg"
+                icon.color: modelData.favorite ? theme.accent : "#8a8a92"
+                ToolTip.visible: hovered
+                ToolTip.text: modelData.favorite ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                onClicked: backend.setLookFavorite(index, !modelData.favorite)
+            }
             Label { text: modelData.name; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
             Label { visible: modelData.active; text: qsTr("On now"); color: theme.accent }
             Label {

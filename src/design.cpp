@@ -624,6 +624,7 @@ QList<Look> loadLooks(QSettings &s) {
         if (!name.isEmpty()) {
             Look look{name, loadAt(s, QString()), loadMouse(s, QString())};
             look.laptop = Laptop::decode(s.value("laptop/aura").toString(), &look.hasLaptop);
+            look.favorite = s.value("favorite", false).toBool();
             looks.append(look);
         }
     }
@@ -641,6 +642,8 @@ void storeLooks(QSettings &s, const QList<Look> &looks) {
         storeMouse(s, QString(), looks[i].mouse);
         if (looks[i].hasLaptop)
             s.setValue("laptop/aura", Laptop::encode(looks[i].laptop));
+        if (looks[i].favorite)
+            s.setValue("favorite", true);
     }
     s.endArray();
 }

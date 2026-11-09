@@ -2432,6 +2432,48 @@ private slots:
         QVERIFY(backend->error().startsWith("Couldn't import missing.json"));
     }
 
+    void favoriteLooksComeFirst()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        backend->setServiceRunner([](const QStringList &, QString *) { return 0; });
+        for (const char *name : {"Alpha", "Bravo", "Charlie", "Delta"})
+            backend->saveLook(name);
+        auto names = [&] {
+            QStringList list;
+            for (const QVariant &v : backend->looks())
+                list << v.toMap().value("name").toString();
+            return list;
+        };
+
+        // Marking one moves it up with the other favorites, the rest keep their order.
+        backend->setLookFavorite(2, true); // Charlie
+        QCOMPARE(names(), QStringList({"Charlie", "Alpha", "Bravo", "Delta"}));
+        QVERIFY(backend->looks().at(0).toMap().value("favorite").toBool());
+        QVERIFY(!backend->looks().at(1).toMap().value("favorite").toBool());
+        backend->setLookFavorite(3, true); // Delta
+        QCOMPARE(names(), QStringList({"Charlie", "Delta", "Alpha", "Bravo"}));
+
+        // Kept for the next start.
+        QSettings settings(dir.path() + "/settings.ini", QSettings::IniFormat);
+        const QList<Design::Look> stored = Design::loadLooks(settings);
+        QCOMPARE(stored.at(0).name, QString("Charlie"));
+        QVERIFY(stored.at(0).favorite && stored.at(1).favorite && !stored.at(2).favorite);
+
+        // Unmarking moves it below the favorites; out of range does nothing.
+        backend->setLookFavorite(0, false); // Charlie
+        QCOMPARE(names(), QStringList({"Delta", "Charlie", "Alpha", "Bravo"}));
+        backend->setLookFavorite(9, true);
+        QCOMPARE(names(), QStringList({"Delta", "Charlie", "Alpha", "Bravo"}));
+
+        // Saving over a favorite keeps it a favorite; a new look starts below them.
+        backend->saveLook("Delta");
+        backend->saveLook("Echo");
+        QCOMPARE(names(), QStringList({"Delta", "Charlie", "Alpha", "Bravo", "Echo"}));
+        QVERIFY(backend->looks().at(0).toMap().value("favorite").toBool());
+    }
+
     void lightServicePacesItsReports()
     {
         // Reports sent back to back left the keyboard stuck after minutes of
