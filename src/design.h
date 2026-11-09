@@ -4,10 +4,12 @@
 #include <QColor>
 #include <QSet>
 #include <QHash>
+#include <QJsonObject>
 #include <QList>
 #include <QSettings>
 #include <QString>
 #include <QStringList>
+#include <optional>
 
 #include "protocol.h"
 #include "laptop.h"
@@ -134,6 +136,13 @@ QList<Look> loadLooks(QSettings &settings);
 void storeLooks(QSettings &settings, const QList<Look> &looks);
 // Index of the look with this name, ignoring case, or -1.
 int findLook(const QList<Look> &looks, const QString &name);
+
+// A look as a shareable file: {"omaglow": "look", "version": 1, "name",
+// "keyboard", "mouse", "laptop"}, effects by name so files outlive any
+// reordering. Reading refuses other files with a reason in error, and
+// drops or clamps what it can't use inside a look, as stored settings are.
+QJsonObject lookToJson(const Look &look);
+std::optional<Look> lookFromJson(const QByteArray &bytes, QString *error = nullptr);
 
 // What to send after switching to the profile: its design, its effect, or
 // lights off. The keyboard keeps drawing a direct-mode frame across a profile

@@ -1,5 +1,8 @@
 #include "design.h"
 
+#include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QSet>
 #include <algorithm>
 #include <QtMath>
@@ -685,6 +688,215 @@ QList<QByteArray> packetsFor(const ProfileLighting &profile) {
 
 QList<QByteArray> packetsForProfile(QSettings &settings, int profile) {
     return packetsFor(load(settings, profile));
+}
+
+namespace {
+
+// Names in look files. Their order is the enums', and only grows.
+const QStringList layerEffectNames{"static", "breathing", "strobing", "color-cycle", "rainbow", "starry-night",
+                                   "comet", "tide", "current", "fire", "plasma", "scanner", "fireflies",
+                                   "heartbeat", "gradient", "music", "workspaces", "meter", "notifications",
+                                   "timer", "typing", "shockwave", "embers"};
+const QStringList meterSourceNames{"cpu", "temperature", "battery"};
+const QStringList speedNames{"fast", "normal", "slow"};           // keyboard and layers: 0 is fast
+const QStringList laptopSpeedNames{"slow", "normal", "fast"};     // asusctl: 0 is low
+const QStringList colorModeNames{"single", "double", "random"};
+const QStringList thicknessNames{"slim", "normal", "thick"};
+const QStringList mouseEffectNames{"off", "static", "breathing", "spectrum"};
+const QStringList laptopEffectNames{"static", "breathe", "rainbow-cycle", "rainbow-wave"};
+const QStringList directionNames{"up", "down", "left", "right"};
+const QStringList laptopBrightnessNames{"off", "low", "medium", "high"};
+const QList<QPair<int, QString>> mouseZoneNames{{Razer::Logo, "logo"}, {Razer::ScrollWheel, "scroll-wheel"}};
+
+QString keyboardEffectName(int effect) {
+    return QString::fromUtf8(Protocol::effectInfo(effect).name).toLower().replace(' ', '-');
+}
+
+int keyboardEffectOf(const QString &name) {
+    for (int e = 0; e < Protocol::EffectCount; ++e)
+        if (keyboardEffectName(e) == name)
+            return e;
+    return -1;
+}
+
+// A name from the list, or the fallback when it isn't one.
+int indexOr(const QStringList &names, const QJsonValue &value, int fallback) {
+    const int i = names.indexOf(value.toString());
+    return i >= 0 ? i : fallback;
+}
+
+QColor colorOr(const QJsonValue &value, const QColor &fallback) {
+    const QColor c(value.toString());
+    return c.isValid() ? c : fallback;
+}
+
+QString colorName(const QColor &c) {
+    return c.toRgb().name();
+}
+
+QString fileError(const char *text) {
+    return QCoreApplication::translate("Looks", text);
+}
+
+} // namespace
+
+QJsonObject lookToJson(const Look &look) {
+    const ProfileLighting &p = look.lighting;
+    const Protocol::Lighting &l = p.lighting;
+    QJsonObject design;
+    for (auto it = p.keys.begin(); it != p.keys.end(); ++it)
+        design.insert(QString::number(it.key()), colorName(it.value()));
+    QJsonArray layers;
+    for (const Layer &layer : p.layers) {
+        QJsonArray keys;
+        for (int code : layer.keys)
+            keys.append(code);
+        QJsonObject o{{"name", layer.name},
+                      {"effect", layerEffectNames.value(layer.effect)},
+                      {"speed", speedNames.value(qBound(0, layer.speed, 2))},
+                      {"color1", colorName(layer.color1)},
+                      {"color2", colorName(layer.color2)},
+                      {"random", layer.randomColors},
+                      {"keys", keys}};
+        if (layer.effect == Meter)
+            o.insert("source", meterSourceNames.value(qBound(0, layer.option, int(MeterSourceCount) - 1)));
+        if (layer.effect == Timer)
+            o.insert("minutes", layer.option > 0 ? layer.option : int(DefaultTimerMinutes));
+        layers.append(o);
+    }
+    QJsonObject keyboard{
+        {"on", p.on},
+        {"custom", p.custom},
+        {"brightness", l.brightness},
+        {"effect", QJsonObject{{"name", keyboardEffectName(l.effect)},
+                               {"speed", speedNames.value(qBound(0, l.speed, 2))},
+                               {"colors", colorModeNames.value(qBound(0, l.colorMode, 2))},
+                               {"color1", colorName(l.color1)},
+                               {"color2", colorName(l.color2)},
+                               {"direction", l.direction},
+                               {"thickness", thicknessNames.value(qBound(0, l.thickness, 2))}}},
+        {"studio", QJsonObject{{"design", design}, {"layers", layers}}}};
+    QJsonObject json{{"omaglow", "look"}, {"version", 1}, {"name", look.name}, {"keyboard", keyboard}};
+    if (!look.mouse.isEmpty()) {
+        QJsonObject mouse;
+        for (const auto &[led, name] : mouseZoneNames) {
+            if (!look.mouse.contains(led))
+                continue;
+            const Razer::Zone z = look.mouse.value(led);
+            mouse.insert(name, QJsonObject{{"effect", mouseEffectNames.value(qBound(0, z.effect, 3))},
+                                           {"color1", colorName(z.color1)},
+                                           {"color2", colorName(z.color2)},
+                                           {"twoColors", z.twoColors},
+                                           {"brightness", z.brightness}});
+        }
+        json.insert("mouse", mouse);
+    }
+    if (look.hasLaptop) {
+        const Laptop::Aura &a = look.laptop;
+        json.insert("laptop", QJsonObject{{"effect", laptopEffectNames.value(qBound(0, a.effect, 3))},
+                                          {"color1", colorName(a.color1)},
+                                          {"color2", colorName(a.color2)},
+                                          {"speed", laptopSpeedNames.value(qBound(0, a.speed, 2))},
+                                          {"direction", directionNames.value(qBound(0, a.direction, 3))},
+                                          {"brightness", laptopBrightnessNames.value(qBound(0, a.brightness, 3))}});
+    }
+    return json;
+}
+
+std::optional<Look> lookFromJson(const QByteArray &bytes, QString *error) {
+    auto fail = [error](const QString &why) -> std::optional<Look> {
+        if (error)
+            *error = why;
+        return std::nullopt;
+    };
+    QJsonParseError parse;
+    const QJsonObject json = QJsonDocument::fromJson(bytes, &parse).object();
+    if (parse.error != QJsonParseError::NoError || json.value("omaglow").toString() != "look")
+        return fail(fileError("This file isn't an Omaglow look."));
+    if (json.value("version").toInt() > 1)
+        return fail(fileError("This look was saved by a newer Omaglow."));
+    Look look;
+    look.name = json.value("name").toString().trimmed();
+    if (look.name.isEmpty())
+        return fail(fileError("The look has no name."));
+
+    // The keyboard: what is missing keeps the defaults, as in the settings.
+    const QJsonObject keyboard = json.value("keyboard").toObject();
+    ProfileLighting &p = look.lighting;
+    p.on = keyboard.value("on").toBool(true);
+    p.custom = keyboard.value("custom").toBool(false);
+    Protocol::Lighting &l = p.lighting;
+    const QJsonValue brightness = keyboard.value("brightness");
+    l.brightness = brightness.isDouble() && brightness.toInt() >= 0 && brightness.toInt() <= 100 ? brightness.toInt() : 100;
+    const QJsonObject effect = keyboard.value("effect").toObject();
+    l.effect = qMax(0, keyboardEffectOf(effect.value("name").toString()));
+    l.speed = indexOr(speedNames, effect.value("speed"), 1);
+    l.colorMode = indexOr(colorModeNames, effect.value("colors"), 0);
+    l.color1 = colorOr(effect.value("color1"), l.color1);
+    l.color2 = colorOr(effect.value("color2"), l.color2);
+    l.direction = effect.value("direction").toInt(-1);
+    l.thickness = indexOr(thicknessNames, effect.value("thickness"), 2);
+    const QJsonObject studio = keyboard.value("studio").toObject();
+    const QJsonObject design = studio.value("design").toObject();
+    for (auto it = design.begin(); it != design.end(); ++it) {
+        const int code = it.key().toInt();
+        const QColor c(it.value().toString());
+        if (Keymap::find(code) && c.isValid())
+            p.keys.insert(code, c);
+    }
+    for (const QJsonValue &v : studio.value("layers").toArray()) {
+        const QJsonObject o = v.toObject();
+        Layer layer;
+        layer.effect = layerEffectNames.indexOf(o.value("effect").toString());
+        if (layer.effect < 0)
+            continue; // an effect this Omaglow doesn't have
+        layer.name = o.value("name").toString().trimmed();
+        layer.speed = indexOr(speedNames, o.value("speed"), 1);
+        layer.color1 = colorOr(o.value("color1"), layer.color1);
+        layer.color2 = colorOr(o.value("color2"), layer.color2);
+        layer.randomColors = o.value("random").toBool(false);
+        if (layer.effect == Meter)
+            layer.option = indexOr(meterSourceNames, o.value("source"), CpuMeter);
+        if (layer.effect == Timer) {
+            const int minutes = o.value("minutes").toInt(DefaultTimerMinutes);
+            layer.option = minutes >= 1 && minutes <= 120 ? minutes : int(DefaultTimerMinutes);
+        }
+        QSet<int> seen;
+        for (const QJsonValue &k : o.value("keys").toArray()) {
+            const int code = k.toInt(-1);
+            if (Keymap::find(code) && !seen.contains(code)) {
+                seen.insert(code);
+                layer.keys.append(code);
+            }
+        }
+        p.layers.append(layer);
+    }
+
+    const QJsonObject mouse = json.value("mouse").toObject();
+    for (const auto &[led, name] : mouseZoneNames) {
+        if (!mouse.contains(name))
+            continue;
+        const QJsonObject o = mouse.value(name).toObject();
+        Razer::Zone z;
+        z.effect = indexOr(mouseEffectNames, o.value("effect"), Razer::Static);
+        z.color1 = colorOr(o.value("color1"), z.color1);
+        z.color2 = colorOr(o.value("color2"), z.color2);
+        z.twoColors = o.value("twoColors").toBool(false);
+        z.brightness = qBound(0, o.value("brightness").toInt(100), 100);
+        look.mouse.insert(led, z);
+    }
+    if (json.contains("laptop")) {
+        const QJsonObject o = json.value("laptop").toObject();
+        Laptop::Aura &a = look.laptop;
+        look.hasLaptop = true;
+        a.effect = indexOr(laptopEffectNames, o.value("effect"), Laptop::Static);
+        a.color1 = colorOr(o.value("color1"), a.color1);
+        a.color2 = colorOr(o.value("color2"), a.color2);
+        a.speed = indexOr(laptopSpeedNames, o.value("speed"), 1);
+        a.direction = indexOr(directionNames, o.value("direction"), 3);
+        a.brightness = indexOr(laptopBrightnessNames, o.value("brightness"), 2);
+    }
+    return look;
 }
 
 } // namespace Design

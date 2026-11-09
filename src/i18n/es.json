@@ -252,5 +252,8 @@
   "The timer keys go dark one by one, the rightmost first, then blink when the time is up.": "Las teclas del temporizador se apagan una por una, empezando por la derecha, y parpadean cuando se acaba el tiempo.",
   "%1 min": "%1 min",
   "Shockwave": "Onda de choque",
-  "Embers": "Brasas"
+  "Embers": "Brasas",
+  "This file isn't an Omaglow look.": "Este archivo no es un estilo de Omaglow.",
+  "This look was saved by a newer Omaglow.": "Este estilo se guardó con una versión más nueva de Omaglow.",
+  "The look has no name.": "El estilo no tiene nombre."
 }

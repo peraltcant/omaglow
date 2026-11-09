@@ -734,6 +734,113 @@ private slots:
         QVERIFY(Design::animated(lighting));
     }
 
+    void looksRoundTripThroughJsonFiles()
+    {
+        Design::Look look;
+        look.name = "War band";
+        look.lighting.on = true;
+        look.lighting.custom = true;
+        look.lighting.lighting.effect = Protocol::Rainbow;
+        look.lighting.lighting.brightness = 80;
+        look.lighting.lighting.speed = 2;
+        look.lighting.lighting.colorMode = 1;
+        look.lighting.lighting.color1 = QColor("#ff0000");
+        look.lighting.lighting.color2 = QColor("#00ff00");
+        look.lighting.lighting.direction = 3;
+        look.lighting.lighting.thickness = 1;
+        look.lighting.keys = {{0x6e, QColor("#ff0000")}, {0x3d, QColor("#ffcc00")}};
+        Design::Layer fire;
+        fire.name = "Hell | fire";
+        fire.effect = Design::Fire;
+        fire.speed = 0;
+        fire.color1 = QColor("#ff0000");
+        fire.color2 = QColor("#ffcc00");
+        fire.keys = {0x3d, 0x3c};
+        Design::Layer meter = fire;
+        meter.name = "Heat";
+        meter.effect = Design::Meter;
+        meter.option = Design::TemperatureMeter;
+        meter.randomColors = true;
+        Design::Layer timer = fire;
+        timer.name = "Pomodoro";
+        timer.effect = Design::Timer;
+        timer.option = 45;
+        look.lighting.layers = {fire, meter, timer};
+        Razer::Zone logo;
+        logo.effect = Razer::Breathing;
+        logo.color1 = QColor("#ff0000");
+        logo.color2 = QColor("#ff8000");
+        logo.twoColors = true;
+        logo.brightness = 70;
+        look.mouse.insert(Razer::Logo, logo);
+        look.hasLaptop = true;
+        look.laptop.effect = Laptop::RainbowWave;
+        look.laptop.speed = 2;
+        look.laptop.direction = 1;
+        look.laptop.brightness = 3;
+
+        const QJsonObject json = Design::lookToJson(look);
+        // Readable: effects by name, so a file keeps working whatever the order inside.
+        QCOMPARE(json.value("omaglow").toString(), QString("look"));
+        QCOMPARE(json.value("version").toInt(), 1);
+        const QJsonObject keyboard = json.value("keyboard").toObject();
+        QCOMPARE(keyboard.value("effect").toObject().value("name").toString(), QString("rainbow"));
+        const QJsonArray layers = keyboard.value("studio").toObject().value("layers").toArray();
+        QCOMPARE(layers.at(0).toObject().value("effect").toString(), QString("fire"));
+        QCOMPARE(layers.at(1).toObject().value("source").toString(), QString("temperature"));
+        QCOMPARE(layers.at(2).toObject().value("minutes").toInt(), 45);
+        QCOMPARE(json.value("mouse").toObject().value("logo").toObject().value("effect").toString(), QString("breathing"));
+        QCOMPARE(json.value("laptop").toObject().value("effect").toString(), QString("rainbow-wave"));
+
+        // Through a file's bytes and back, the same look.
+        QString error;
+        const auto back = Design::lookFromJson(QJsonDocument(json).toJson(), &error);
+        QVERIFY2(back.has_value(), qPrintable(error));
+        QCOMPARE(back->name, look.name);
+        QVERIFY(Design::sameLook(back->lighting, look.lighting));
+        QCOMPARE(back->lighting.lighting.brightness, 80);
+        QCOMPARE(Design::encodeLayers(back->lighting.layers), Design::encodeLayers(look.lighting.layers));
+        QCOMPARE(Razer::encodeZone(back->mouse.value(Razer::Logo)), Razer::encodeZone(logo));
+        QVERIFY(!back->mouse.contains(Razer::ScrollWheel));
+        QVERIFY(back->hasLaptop);
+        QCOMPARE(Laptop::encode(back->laptop), Laptop::encode(look.laptop));
+
+        // A look without mouse or laptop leaves them as they are.
+        Design::Look bare;
+        bare.name = "Bare";
+        const auto bareBack = Design::lookFromJson(QJsonDocument(Design::lookToJson(bare)).toJson(), &error);
+        QVERIFY(bareBack.has_value() && bareBack->mouse.isEmpty() && !bareBack->hasLaptop);
+
+        // Other files are refused, with a reason.
+        QVERIFY(!Design::lookFromJson("not json", &error));
+        QCOMPARE(error, QString("This file isn't an Omaglow look."));
+        QVERIFY(!Design::lookFromJson(R"({"omaglow": "profile", "version": 1, "name": "x"})", &error));
+        QCOMPARE(error, QString("This file isn't an Omaglow look."));
+        QVERIFY(!Design::lookFromJson(R"({"omaglow": "look", "version": 2, "name": "x"})", &error));
+        QCOMPARE(error, QString("This look was saved by a newer Omaglow."));
+        QVERIFY(!Design::lookFromJson(R"({"omaglow": "look", "version": 1, "name": "  "})", &error));
+        QCOMPARE(error, QString("The look has no name."));
+
+        // Inside a valid file, what Omaglow can't use is dropped or clamped,
+        // as with stored settings: unknown keys, layers with unknown effects,
+        // colors that aren't colors, brightness out of range.
+        const QByteArray odd = R"({"omaglow": "look", "version": 1, "name": "Odd",
+            "keyboard": {"on": true, "custom": true, "brightness": 400,
+                "effect": {"name": "nope", "color1": "blue-ish"},
+                "studio": {"design": {"110": "#ff0000", "9999": "#00ff00", "61": "not a color"},
+                           "layers": [{"name": "Gone", "effect": "lasers", "keys": [61]},
+                                      {"name": "Kept", "effect": "tide", "speed": "slow", "keys": [61, 9999, 61]}]}}})";
+        const auto cleaned = Design::lookFromJson(odd, &error);
+        QVERIFY2(cleaned.has_value(), qPrintable(error));
+        QCOMPARE(cleaned->lighting.lighting.brightness, 100);
+        QCOMPARE(cleaned->lighting.lighting.effect, int(Protocol::Static));
+        QCOMPARE(cleaned->lighting.keys.size(), 1);
+        QCOMPARE(cleaned->lighting.layers.size(), 1);
+        QCOMPARE(cleaned->lighting.layers.first().name, QString("Kept"));
+        QCOMPARE(cleaned->lighting.layers.first().speed, 2);
+        QCOMPARE(cleaned->lighting.layers.first().keys, QList<int>({61}));
+    }
+
     void layerEffectsMoveOverTime()
     {
         Design::ProfileLighting lighting;
