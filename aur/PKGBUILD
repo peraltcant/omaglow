@@ -1,0 +1,36 @@
+# Maintainer: Yader Peralta Cantarero
+# Builds a released version from its git tag; pkgbuild/PKGBUILD builds the
+# local checkout instead (bin/install).
+pkgname=omaglow
+pkgver=0.30.0
+pkgrel=1
+pkgdesc='Lighting and settings for the ROG Azoth keyboard, Razer DeathAdder V2 mouse and ASUS Aura laptops'
+arch=('x86_64' 'aarch64')
+url='https://github.com/peraltcant/omaglow'
+license=('MIT' 'ISC')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'xdg-desktop-portal' 'libpulse')
+makedepends=('git')
+optdepends=('asusctl: ASUS laptop keyboard lighting'
+            'hyprland: the Workspaces layer')
+source=("git+$url.git#tag=v$pkgver")
+sha256sums=('df7bfdb4cd67b1db471fbac6db4602ab2e9009c3ae21d4a1ccf1cde3098b87a4')
+
+build() {
+  cd "$pkgname"
+  ./bin/build
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 build/omaglow "$pkgdir/usr/bin/omaglow"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 src/icons/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LUCIDE-LICENSE"
+  install -Dm644 pkgbuild/omaglow.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omaglow.svg"
+  install -Dm644 pkgbuild/omaglow.desktop "$pkgdir/usr/share/applications/omaglow.desktop"
+  install -Dm644 pkgbuild/70-omaglow-rog-azoth.rules "$pkgdir/usr/lib/udev/rules.d/70-omaglow-rog-azoth.rules"
+  install -Dm644 pkgbuild/70-omaglow-razer.rules "$pkgdir/usr/lib/udev/rules.d/70-omaglow-razer.rules"
+  install -Dm644 pkgbuild/omaglow-clock.service "$pkgdir/usr/lib/systemd/user/omaglow-clock.service"
+  install -Dm644 pkgbuild/omaglow-music.service "$pkgdir/usr/lib/systemd/user/omaglow-music.service"
+  install -Dm644 pkgbuild/omaglow-lights.service "$pkgdir/usr/lib/systemd/user/omaglow-lights.service"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/omaglow/README.md"
+}

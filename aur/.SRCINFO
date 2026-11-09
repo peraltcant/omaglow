@@ -1,0 +1,22 @@
+pkgbase = omaglow
+	pkgdesc = Lighting and settings for the ROG Azoth keyboard, Razer DeathAdder V2 mouse and ASUS Aura laptops
+	pkgver = 0.30.0
+	pkgrel = 1
+	url = https://github.com/peraltcant/omaglow
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	license = ISC
+	makedepends = git
+	depends = qt6-base
+	depends = qt6-declarative
+	depends = qt6-svg
+	depends = qt6-wayland
+	depends = xdg-desktop-portal
+	depends = libpulse
+	optdepends = asusctl: ASUS laptop keyboard lighting
+	optdepends = hyprland: the Workspaces layer
+	source = git+https://github.com/peraltcant/omaglow.git#tag=v0.30.0
+	sha256sums = df7bfdb4cd67b1db471fbac6db4602ab2e9009c3ae21d4a1ccf1cde3098b87a4
+
+pkgname = omaglow

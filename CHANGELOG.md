@@ -4,6 +4,10 @@ Each version's changes, newest first. The version is in `VERSION`.
 
 ## Unreleased
 
+- A PKGBUILD for the AUR in `aur/`, building a released tag.
+- The README says Omaglow isn't affiliated with ASUS or Razer and never writes
+  firmware, and shows the current app.
+
 ## 0.30.0
 
 - Moving layers run smoother: each frame sends only the keys that changed, so

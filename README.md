@@ -7,6 +7,11 @@ without Armoury Crate, Synapse or other vendor software. One app for the
 keyboard, the mouse and the laptop, with looks that light all of them at once
 and an option to follow the Omarchy theme.
 
+Omaglow is a personal project, not affiliated with or endorsed by ASUS or
+Razer. It sends the same settings and lighting commands the vendor software
+sends and never updates or writes firmware. It is tested only on the devices
+below; others may not work, and support is best effort.
+
 ## Supported devices
 
 | Device | What Omaglow does | How |
@@ -185,15 +190,20 @@ not affiliated with or endorsed by either company.
 ```sh
 bin/build           # build/omaglow
 bin/test            # Qt Test, offscreen
-bin/check-version   # VERSION and the PKGBUILD's pkgver agree
+bin/check-version   # VERSION and both PKGBUILDs' pkgver agree
 ```
 
 CI (`.github/workflows/ci.yml`) runs these three on Arch Linux for every push
 and pull request.
 
-To release a version: write it in `VERSION` and in `pkgbuild/PKGBUILD`'s
-`pkgver`, move the Unreleased notes in `CHANGELOG.md` under it, and tag the
-commit `vX.Y.Z`.
+To release a version: write it in `VERSION` and in the `pkgver` of
+`pkgbuild/PKGBUILD` and `aur/PKGBUILD`, move the Unreleased notes in
+`CHANGELOG.md` under it, and tag the commit `vX.Y.Z`. Then, in `aur/`, put the
+output of `makepkg -g` in `sha256sums` and run
+`makepkg --printsrcinfo > .SRCINFO`.
+
+`pkgbuild/PKGBUILD` builds this checkout (`bin/install`); `aur/PKGBUILD` builds
+a released tag from GitHub, for the AUR.
 
 The protocol was reverse engineered from Armoury Crate USB captures; the packet
 builders in `src/protocol.cpp` are tested against the captured bytes.
