@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     appLock.tryLock(0);
     app.setApplicationName(AppInfo::Name);
     app.setOrganizationName(AppInfo::Name);
-    app.setApplicationVersion("0.26.0");
+    app.setApplicationVersion("0.27.0");
 
     // Matches the window to omaglow.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.
