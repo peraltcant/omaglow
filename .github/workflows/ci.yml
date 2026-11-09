@@ -22,5 +22,10 @@ jobs:
       - name: Build the app
         run: bin/build
 
+      # As a user, not root: root opens any file, so the tests for a missing
+      # permission (a keyboard the user can't reach) only run as a user.
       - name: Build and run the tests
-        run: bin/test
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c bin/test
