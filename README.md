@@ -76,6 +76,10 @@ stored on the keyboard and survive reboots and other computers.
   `.json` file and import look files, to move looks between computers or share
   them (see Look files below).
 
+Limits: the keyboard can't report its settings back, so the app shows the last
+ones it sent, and there are no hardware macros (firmware 4.00.18 doesn't have
+them).
+
 ## Devices and theme
 
 - Devices: the laptop keyboard through asusctl (static, breathing, rainbow,
@@ -194,7 +198,8 @@ bin/check-version   # VERSION and both PKGBUILDs' pkgver agree
 ```
 
 CI (`.github/workflows/ci.yml`) runs these three on Arch Linux for every push
-and pull request.
+and pull request. `main` takes only commits whose CI build passed: push a
+branch, wait for the check, then fast-forward `main`.
 
 To release a version: write it in `VERSION` and in the `pkgver` of
 `pkgbuild/PKGBUILD` and `aur/PKGBUILD`, move the Unreleased notes in
@@ -205,15 +210,8 @@ output of `makepkg -g` in `sha256sums` and run
 `pkgbuild/PKGBUILD` builds this checkout (`bin/install`); `aur/PKGBUILD` builds
 a released tag from GitHub, for the AUR.
 
-`bin/protect-github --apply` sets GitHub rulesets once the repository is
-public: `main` can't be deleted or force-pushed and takes only commits whose CI
-build passed (push the branch, wait for the check, then fast-forward `main`),
-and `v*` tags can't be deleted or moved. Without `--apply` it only shows them.
-
 The protocol was reverse engineered from Armoury Crate USB captures; the packet
 builders in `src/protocol.cpp` are tested against the captured bytes.
-Hardware macros don't exist on firmware 4.00.18, and the keyboard can't report
-its settings back, so the app remembers the last ones it sent.
 
 ## License
 
