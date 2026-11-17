@@ -43,9 +43,12 @@ stored on the keyboard and survive reboots and other computers.
   functions keep working: once a program talks to the keyboard it stops doing
   them itself and only reports the turns, so Omaglow does them. Brightness
   moves ten points a notch, and lighting effect goes to the next or previous
-  look. A user service (`omaglow-knob.service`, running `omaglow knob`) does
-  this while the app is closed; the app turns it on when it finds the keyboard.
-  The keyboard can't be asked which function is on, so after the first start
+  look. The keyboard no longer shows the change on its display, so it shows on
+  the desktop instead (Omarchy's on-screen display): the percentage, or the
+  look's name. A user service (`omaglow-knob.service`, running `omaglow knob`)
+  does this while the app is closed; the app turns it on the first time it
+  finds the keyboard, and it stays off if you disable it afterwards. The
+  keyboard can't be asked which function is on, so after the first start
   switch the knob's function once.
 - Five profiles plus the default one, each with its own lighting, keys and
   knob, picked from the sidebar (Fn + 1–6 on the keyboard switches too).

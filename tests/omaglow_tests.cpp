@@ -14,6 +14,7 @@
 #include <memory>
 #include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -682,6 +683,8 @@ private slots:
         QTemporaryDir dir;
         FakeLink *link = nullptr;
         auto backend = makeBackend(dir, &link);
+        QList<QStringList> osd;
+        backend->setOsdRunner([&](const QStringList &args) { osd.append(args); });
         const auto active = [&] {
             for (const QVariant &look : backend->looks())
                 if (look.toMap().value("active").toBool())
@@ -699,7 +702,12 @@ private slots:
         QCOMPARE(active(), QString("#0000ff"));
 
         // Lighting effect: the next look, around the ends of the list.
+        osd.clear();
         backend->knobTurned(Protocol::KnobEffect, 1);
+        QCOMPARE(active(), QString("#ff0000"));
+        // The keyboard no longer shows what changed, so the desktop does.
+        QCOMPARE(osd, QList<QStringList>({{"-i", "keyboard", "-m", "#ff0000"}}));
+        backend->knobTurned(Protocol::KnobEffect, 0); // not a notch
         QCOMPARE(active(), QString("#ff0000"));
         backend->knobTurned(Protocol::KnobEffect, -1);
         QCOMPARE(active(), QString("#0000ff"));
@@ -710,8 +718,10 @@ private slots:
         QVERIFY(!link->sent.isEmpty());
 
         // Lighting brightness: ten points a notch, kept within 0 and 100.
+        osd.clear();
         backend->knobTurned(Protocol::KnobKeyboardBrightness, 1);
         QCOMPARE(backend->brightness(), 60);
+        QCOMPARE(osd, QList<QStringList>({{"-i", "keyboard", "-p", "60"}}));
         backend->knobTurned(Protocol::KnobKeyboardBrightness, -1);
         backend->knobTurned(Protocol::KnobKeyboardBrightness, -1);
         QCOMPARE(backend->brightness(), 40);
@@ -733,15 +743,34 @@ private slots:
         backend->knobTurned(Protocol::KnobOledBrightness, -1);
         QCOMPARE(backend->oledBrightness(), 90);
         QVERIFY(link->sent.contains(Protocol::oledBrightness(90)));
+        QCOMPARE(osd.last(), QStringList({"-i", "display", "-p", "90"}));
+        backend->knobTurned(Protocol::KnobOledBrightness, 1);
+        backend->knobTurned(Protocol::KnobOledBrightness, 1);
+        QCOMPARE(backend->oledBrightness(), 100);
+        QCOMPARE(osd.last(), QStringList({"-i", "display", "-p", "100"}));
+        backend->knobTurned(Protocol::KnobOledBrightness, -1);
 
         // Volume, media and the custom function are the keyboard's own.
         link->sent.clear();
+        osd.clear();
         for (int function : {int(Protocol::KnobVolume), int(Protocol::KnobMedia), int(Protocol::KnobCustom)})
             backend->knobTurned(function, 1);
         backend->flush();
         QVERIFY(link->sent.isEmpty());
+        QVERIFY(osd.isEmpty());
         QCOMPARE(active(), QString("#0000ff"));
         QCOMPARE(backend->oledBrightness(), 90);
+
+        // Two looks with the same keyboard lighting don't trap the knob.
+        backend->saveLook("blue again");
+        QStringList seen;
+        for (int i = 0; i < 4; ++i) {
+            backend->knobTurned(Protocol::KnobEffect, 1);
+            seen.append(osd.last().last());
+        }
+        QCOMPARE(seen, QStringList({"#ff0000", "#00ff00", "#0000ff", "blue again"}));
+        backend->knobTurned(Protocol::KnobEffect, -1);
+        QCOMPARE(osd.last().last(), QString("#0000ff"));
     }
 
     // With the app closed, `omaglow knob` does the knob functions.
@@ -764,6 +793,7 @@ private slots:
                     own, picker);
                 own->setParent(backend);
                 picker->setParent(backend);
+                backend->setOsdRunner([](const QStringList &) {});
                 return backend;
             },
             [&] { return appOpen; });
@@ -795,25 +825,31 @@ private slots:
         QVERIFY(sent.isEmpty());
     }
 
-    // The app keeps that service on while there is an Azoth.
-    void backendKeepsTheKnobServiceOn()
+    // The app turns that service on the first time it finds an Azoth.
+    void backendTurnsTheKnobServiceOnOnce()
     {
         QTemporaryDir dir;
         FakeLink *link = nullptr;
         auto backend = makeBackend(dir, &link);
         QStringList commands;
-        bool enabled = false;
+        int result = 1;
         backend->setServiceRunner([&](const QStringList &args, QString *) {
             commands.append(args.join(' '));
-            return args.contains("is-enabled") && !enabled ? 1 : 0;
+            return result;
         });
+        // It couldn't (no user bus, say): tried again on the next start.
         backend->syncKnobService();
-        QCOMPARE(commands, QStringList({"--user is-enabled --quiet omaglow-knob.service",
+        backend->syncKnobService();
+        QCOMPARE(commands, QStringList({"--user enable --now omaglow-knob.service",
                                         "--user enable --now omaglow-knob.service"}));
         commands.clear();
-        enabled = true;
+        result = 0;
         backend->syncKnobService();
-        QCOMPARE(commands, QStringList({"--user is-enabled --quiet omaglow-knob.service"}));
+        QCOMPARE(commands, QStringList({"--user enable --now omaglow-knob.service"}));
+        // Done once: whoever turns it off afterwards keeps it off.
+        commands.clear();
+        backend->syncKnobService();
+        QVERIFY(commands.isEmpty());
 
         // No keyboard, no service.
         QTemporaryDir other;
@@ -821,8 +857,7 @@ private slots:
         Backend none([] { return DeviceNode{}; }, [](const QString &) -> Link * { return nullptr; }, settings,
                      new FakePicker);
         settings->setParent(&none);
-        commands.clear();
-        none.setServiceRunner([&](const QStringList &args, QString *) { commands.append(args.join(' ')); return 1; });
+        none.setServiceRunner([&](const QStringList &args, QString *) { commands.append(args.join(' ')); return 0; });
         none.syncKnobService();
         QVERIFY(commands.isEmpty());
     }
@@ -888,6 +923,11 @@ private slots:
         knob.feed(QByteArray::fromHex("01000200"), 3100);
         knob.feed(hex("037201"), 4000);
         QCOMPARE(turns, (QList<QPair<int, int>>{{Protocol::KnobOledBrightness, 1}}));
+        // Nor one pressed right before a notch of a function the keyboard itself said.
+        knob.feed(QByteArray::fromHex("01000200"), 5000);
+        knob.feed(hex("037204"), 5005);
+        QCOMPARE(turns.size(), 2);
+        QCOMPARE(settings.value("knob/function").toInt(), int(Protocol::KnobOledBrightness));
 
         // The interface that carries them: the Azoth's vendor page ffc0.
         QTemporaryDir sys;
@@ -901,6 +941,30 @@ private slots:
         node("hidraw8", "00001A83", QByteArray::fromHex("05010906a101"));
         node("hidraw3", "0000C52B", QByteArray::fromHex("06c0ff0901a1018503"));
         QCOMPARE(Knob::inputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw0"}));
+
+        // Reading it: the keyboard may be away at the start, and come and go.
+        QTemporaryDir dev;
+        KnobListener reader(&settings);
+        reader.setRoots(sys.path(), dev.path(), 20);
+        turns.clear();
+        connect(&reader, &KnobListener::turned, [&](int function, int step) { turns.append({function, step}); });
+        reader.start();
+        const QByteArray fifo = QFile::encodeName(dev.filePath("hidraw0"));
+        QCOMPARE(::mkfifo(fifo.constData(), 0600), 0);
+        int out = -1;
+        QTRY_VERIFY((out = ::open(fifo.constData(), O_WRONLY | O_NONBLOCK)) >= 0); // opens once it is read
+        const QByteArray function = hex("0391000002"), up = hex("037201");
+        QCOMPARE(::write(out, function.constData(), function.size()), ssize_t(function.size()));
+        QTRY_COMPARE(settings.value("knob/function").toInt(), int(Protocol::KnobKeyboardBrightness));
+        QCOMPARE(::write(out, up.constData(), up.size()), ssize_t(up.size()));
+        QTRY_COMPARE(turns, (QList<QPair<int, int>>{{Protocol::KnobKeyboardBrightness, 1}}));
+        // Unplugged and back: read again without a restart.
+        ::close(out);
+        QTest::qWait(60);
+        QTRY_VERIFY((out = ::open(fifo.constData(), O_WRONLY | O_NONBLOCK)) >= 0);
+        QCOMPARE(::write(out, up.constData(), up.size()), ssize_t(up.size()));
+        QTRY_COMPARE(turns.size(), 2);
+        ::close(out);
     }
 
     void shockwaveAndEmbersBlendOverTheLayersUnder()

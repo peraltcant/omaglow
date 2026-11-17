@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QByteArray>
+#include <QElapsedTimer>
 #include <QObject>
+#include <QSet>
 #include <QSettings>
 #include <QSocketNotifier>
 #include <QStringList>
@@ -43,6 +45,8 @@ public:
 
     // Opens the keyboard's interface, again whenever it comes back.
     void start();
+    // For tests: where the nodes are looked for, and how often.
+    void setRoots(const QString &sysRoot, const QString &devRoot, int retryMs);
     // One report, and when it came in milliseconds; start() feeds what it reads.
     void feed(const QByteArray &report, qint64 nowMs);
 
@@ -52,17 +56,22 @@ signals:
 
 private:
     void open();
-    void close();
+    void close(int fd);
     void read(int fd);
     void setFunction(int function);
 
     QSettings *m_settings;
     int m_function = -1; // unknown until the keyboard says
+    bool m_said = false; // the keyboard said the function in this run
     qint64 m_mediaAt = -1;
+    QElapsedTimer m_clock;
     struct Input {
+        QString path;
         int fd;
         std::unique_ptr<QSocketNotifier> notifier;
     };
     std::vector<Input> m_inputs;
-    QTimer m_retry; // the keyboard may come and go
+    QString m_sysRoot = "/sys", m_devRoot = "/dev";
+    QSet<QString> m_warned; // nodes that wouldn't open, said once each
+    QTimer m_retry;         // the keyboard may come and go
 };

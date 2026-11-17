@@ -224,7 +224,7 @@ public:
     // outside the app.
     void syncLightsService();
     // Turns on the service that does the knob functions with the app closed,
-    // when there is an Azoth; it is left on afterwards.
+    // the first time there is an Azoth; turned off afterwards, it stays off.
     void syncKnobService();
 
     QVariantList looks() const;
@@ -254,6 +254,10 @@ public:
     void setHooksDirectory(const QString &path) { m_hooksDirectory = path; }
     using AsusctlRunner = std::function<int(const QStringList &args)>;
     void setAsusctlRunner(AsusctlRunner runner) { m_asusctl = std::move(runner); }
+    // Shows a knob change on the desktop (omarchy-osd), since the keyboard no
+    // longer shows it on its display.
+    using OsdRunner = std::function<void(const QStringList &args)>;
+    void setOsdRunner(OsdRunner runner) { m_osd = std::move(runner); }
     // Whether the laptop keyboard can be driven (asusctl installed); for tests.
     using LaptopFinder = std::function<bool()>;
     void setLaptopFinder(LaptopFinder finder) { m_laptopFinder = std::move(finder); }
@@ -406,6 +410,7 @@ private:
     void markNotResponding();
     Finder m_mouseFinder;
     AsusctlRunner m_asusctl;
+    OsdRunner m_osd;
     LaptopFinder m_laptopFinder;
     bool m_followTheme = false;
     QString m_hooksDirectory;

@@ -34,6 +34,7 @@ constexpr int replyTimeoutMs = 400;
 
 namespace {
 const char knobLookKey[] = "knob/look";
+const char knobServiceKey[] = "knob/service";
 constexpr int knobBrightnessStep = 10;
 } // namespace
 
@@ -56,6 +57,7 @@ Backend::Backend(Finder finder, Opener opener, QSettings *settings, FilePicker *
         }
         return process.exitStatus() == QProcess::NormalExit ? process.exitCode() : -1;
     };
+    m_osd = [](const QStringList &args) { QProcess::startDetached("omarchy-osd", args); };
     m_mouseOpener = [this]() -> Razer::FeaturePort * {
         const DeviceNode node = m_mouseFinder();
         return node.status == DeviceNode::Found ? Razer::HidrawFeaturePort::open(node.path) : nullptr;
@@ -1131,11 +1133,13 @@ void Backend::syncLightsService() {
 }
 
 void Backend::syncKnobService() {
-    if (m_finder().status != DeviceNode::Found)
+    if (m_settings->value(knobServiceKey, false).toBool() || m_finder().status != DeviceNode::Found)
         return;
-    QString ignored;
-    if (m_serviceRunner({"--user", "is-enabled", "--quiet", AppInfo::service("knob")}, &ignored) != 0)
-        m_serviceRunner({"--user", "enable", "--now", AppInfo::service("knob")}, &ignored);
+    QString error;
+    if (m_serviceRunner({"--user", "enable", "--now", AppInfo::service("knob")}, &error) == 0)
+        m_settings->setValue(knobServiceKey, true);
+    else
+        qWarning().noquote() << "couldn't turn on" << AppInfo::service("knob") + ":" << error;
 }
 
 QVariantList Backend::looks() const {
@@ -1173,6 +1177,7 @@ void Backend::saveLook(const QString &name) {
         m_looks.append(look);
     }
     storeLooks();
+    m_settings->setValue(knobLookKey, trimmed);
 }
 
 void Backend::setLookFavorite(int index, bool favorite) {
@@ -1184,24 +1189,35 @@ void Backend::setLookFavorite(int index, bool favorite) {
 }
 
 void Backend::knobTurned(int function, int step) {
+    if (step == 0)
+        return;
     step = step > 0 ? 1 : -1;
     if (function == Protocol::KnobKeyboardBrightness) {
         setBrightness(m_lighting.brightness + step * knobBrightnessStep);
+        m_osd({"-i", "keyboard", "-p", QString::number(m_lighting.brightness)});
     } else if (function == Protocol::KnobOledBrightness) {
         setOledBrightness(m_oledBrightness + step * knobBrightnessStep);
+        m_osd({"-i", "display", "-p", QString::number(m_oledBrightness)});
     } else if (function == Protocol::KnobEffect && !m_looks.isEmpty()) {
         const auto at = [this](auto matches) {
             const auto it = std::find_if(m_looks.cbegin(), m_looks.cend(), matches);
             return it == m_looks.cend() ? -1 : int(it - m_looks.cbegin());
         };
-        int index = at([this](const Design::Look &look) { return Design::sameLook(look.lighting, current()); });
-        if (index < 0) {
-            const QString last = m_settings->value(knobLookKey).toString();
-            index = at([&last](const Design::Look &look) { return look.name == last; });
+        // The look last applied or saved, while it still shows; else the first
+        // one that shows; else that last one. Looks may share their keyboard
+        // lighting, and going by what shows alone would stay on the first.
+        const QString last = m_settings->value(knobLookKey).toString();
+        int index = at([&last](const Design::Look &look) { return look.name == last; });
+        if (index < 0 || !Design::sameLook(m_looks[index].lighting, current())) {
+            const int showing = at([this](const Design::Look &look) { return Design::sameLook(look.lighting, current()); });
+            if (showing >= 0)
+                index = showing;
         }
         // From no look at all, up starts at the first and down at the last.
         const int count = int(m_looks.size());
-        applyLook(index < 0 ? (step > 0 ? 0 : count - 1) : (index + step + count) % count);
+        index = index < 0 ? (step > 0 ? 0 : count - 1) : (index + step + count) % count;
+        applyLook(index);
+        m_osd({"-i", "keyboard", "-m", m_looks[index].name});
     }
 }
 

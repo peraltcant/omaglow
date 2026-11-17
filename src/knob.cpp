@@ -3,7 +3,7 @@
 #include "device.h"
 #include "protocol.h"
 
-#include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 
@@ -66,15 +66,22 @@ QStringList Knob::inputNodes(const QString &sysRoot, const QString &devRoot) {
 
 KnobListener::KnobListener(QSettings *settings, QObject *parent) : QObject(parent), m_settings(settings) {
     m_function = m_settings->value(functionKey, -1).toInt();
+    m_clock.start();
     m_retry.setInterval(retryMs);
-    connect(&m_retry, &QTimer::timeout, this, [this] {
-        if (m_inputs.empty())
-            open();
-    });
+    // Every time, not only with nothing open: the keyboard can be on its
+    // receiver and get its cable too.
+    connect(&m_retry, &QTimer::timeout, this, &KnobListener::open);
 }
 
 KnobListener::~KnobListener() {
-    close();
+    while (!m_inputs.empty())
+        close(m_inputs.back().fd);
+}
+
+void KnobListener::setRoots(const QString &sysRoot, const QString &devRoot, int retryMs) {
+    m_sysRoot = sysRoot;
+    m_devRoot = devRoot;
+    m_retry.setInterval(retryMs);
 }
 
 void KnobListener::start() {
@@ -83,24 +90,31 @@ void KnobListener::start() {
 }
 
 void KnobListener::open() {
-    close();
-    for (const QString &path : Knob::inputNodes()) {
+    for (const QString &path : Knob::inputNodes(m_sysRoot, m_devRoot)) {
+        if (std::any_of(m_inputs.cbegin(), m_inputs.cend(), [&](const Input &input) { return input.path == path; }))
+            continue;
         // Read only: each open file gets its own copy of every report.
         const int fd = ::open(QFile::encodeName(path).constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        if (fd < 0)
+        if (fd < 0) {
+            if (!m_warned.contains(path))
+                qWarning().noquote() << "can't read the knob from" << path + ":" << qt_error_string(errno);
+            m_warned.insert(path);
             continue;
-        Input input{fd, std::make_unique<QSocketNotifier>(fd, QSocketNotifier::Read)};
+        }
+        m_warned.remove(path);
+        Input input{path, fd, std::make_unique<QSocketNotifier>(fd, QSocketNotifier::Read)};
         connect(input.notifier.get(), &QSocketNotifier::activated, this, [this, fd] { read(fd); });
         m_inputs.push_back(std::move(input));
     }
 }
 
-void KnobListener::close() {
-    for (Input &input : m_inputs) {
-        input.notifier.reset();
-        ::close(input.fd);
-    }
-    m_inputs.clear();
+void KnobListener::close(int fd) {
+    const auto input = std::find_if(m_inputs.begin(), m_inputs.end(), [fd](const Input &i) { return i.fd == fd; });
+    if (input == m_inputs.end())
+        return;
+    input->notifier.reset();
+    ::close(fd);
+    m_inputs.erase(input);
 }
 
 void KnobListener::read(int fd) {
@@ -110,10 +124,10 @@ void KnobListener::read(int fd) {
         if (n <= 0) {
             // Gone (unplugged): the retry opens it again.
             if (n == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
-                QMetaObject::invokeMethod(this, [this] { close(); }, Qt::QueuedConnection);
+                QMetaObject::invokeMethod(this, [this, fd] { close(fd); }, Qt::QueuedConnection);
             return;
         }
-        feed(QByteArray(buffer, int(n)), QDateTime::currentMSecsSinceEpoch());
+        feed(QByteArray(buffer, int(n)), m_clock.elapsed());
     }
 }
 
@@ -134,12 +148,14 @@ void KnobListener::feed(const QByteArray &report, qint64 nowMs) {
         m_mediaAt = nowMs;
         break;
     case Knob::Event::FunctionChanged:
+        m_said = true;
         setFunction(event.value);
         break;
     case Knob::Event::Turned:
-        if (m_mediaAt >= 0 && nowMs - m_mediaAt <= mediaWindowMs) {
-            // The keyboard did this turn itself (volume or media), so the
-            // function kept from before is wrong.
+        // A function only remembered from an earlier run may be wrong: a media
+        // key sent with the turn means the keyboard did it itself (volume or
+        // media). One the keyboard said in this run is trusted.
+        if (!m_said && m_mediaAt >= 0 && nowMs - m_mediaAt <= mediaWindowMs) {
             if (hostFunction(m_function))
                 setFunction(-1);
         } else if (hostFunction(m_function)) {

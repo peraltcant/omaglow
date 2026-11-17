@@ -7,7 +7,8 @@ Each version's changes, newest first. The version is in `VERSION`.
 - The knob's lighting brightness, OLED brightness and lighting effect functions
   work again: the keyboard leaves them to the program that talks to it, and
   Omaglow now does them, with the app open or closed (`omaglow-knob.service`).
-  Lighting effect switches to the next or previous look.
+  Lighting effect switches to the next or previous look, and the change shows
+  on the desktop (the percentage or the look's name).
 - A PKGBUILD for the AUR in `aur/`, building a released tag.
 - `bin/protect-github` sets GitHub rulesets for `main` and the release tags.
 - The README says Omaglow isn't affiliated with ASUS or Razer and never writes
