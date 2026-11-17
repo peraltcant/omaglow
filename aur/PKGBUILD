@@ -2,7 +2,7 @@
 # Builds a released version from its git tag; pkgbuild/PKGBUILD builds the
 # local checkout instead (bin/install).
 pkgname=omaglow
-pkgver=0.30.0
+pkgver=0.31.0
 pkgrel=1
 pkgdesc='Lighting and settings for the ROG Azoth keyboard, Razer DeathAdder V2 mouse and ASUS Aura laptops'
 arch=('x86_64' 'aarch64')
@@ -32,5 +32,6 @@ package() {
   install -Dm644 pkgbuild/omaglow-clock.service "$pkgdir/usr/lib/systemd/user/omaglow-clock.service"
   install -Dm644 pkgbuild/omaglow-music.service "$pkgdir/usr/lib/systemd/user/omaglow-music.service"
   install -Dm644 pkgbuild/omaglow-lights.service "$pkgdir/usr/lib/systemd/user/omaglow-lights.service"
+  install -Dm644 pkgbuild/omaglow-knob.service "$pkgdir/usr/lib/systemd/user/omaglow-knob.service"
   install -Dm644 README.md "$pkgdir/usr/share/doc/omaglow/README.md"
 }

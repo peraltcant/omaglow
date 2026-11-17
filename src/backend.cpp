@@ -32,6 +32,11 @@ constexpr int stuckTimeoutMs = 150;
 constexpr int replyTimeoutMs = 400;
 }
 
+namespace {
+const char knobLookKey[] = "knob/look";
+constexpr int knobBrightnessStep = 10;
+} // namespace
+
 Backend::Backend(QObject *parent)
     : Backend([] { return Discovery::find(); },
               [](const QString &path) -> Link * { return HidrawLink::openNode(path); },
@@ -1125,6 +1130,14 @@ void Backend::syncLightsService() {
     updateLightsService();
 }
 
+void Backend::syncKnobService() {
+    if (m_finder().status != DeviceNode::Found)
+        return;
+    QString ignored;
+    if (m_serviceRunner({"--user", "is-enabled", "--quiet", AppInfo::service("knob")}, &ignored) != 0)
+        m_serviceRunner({"--user", "enable", "--now", AppInfo::service("knob")}, &ignored);
+}
+
 QVariantList Backend::looks() const {
     QVariantList list;
     for (const auto &look : m_looks)
@@ -1170,11 +1183,35 @@ void Backend::setLookFavorite(int index, bool favorite) {
     storeLooks();
 }
 
+void Backend::knobTurned(int function, int step) {
+    step = step > 0 ? 1 : -1;
+    if (function == Protocol::KnobKeyboardBrightness) {
+        setBrightness(m_lighting.brightness + step * knobBrightnessStep);
+    } else if (function == Protocol::KnobOledBrightness) {
+        setOledBrightness(m_oledBrightness + step * knobBrightnessStep);
+    } else if (function == Protocol::KnobEffect && !m_looks.isEmpty()) {
+        const auto at = [this](auto matches) {
+            const auto it = std::find_if(m_looks.cbegin(), m_looks.cend(), matches);
+            return it == m_looks.cend() ? -1 : int(it - m_looks.cbegin());
+        };
+        int index = at([this](const Design::Look &look) { return Design::sameLook(look.lighting, current()); });
+        if (index < 0) {
+            const QString last = m_settings->value(knobLookKey).toString();
+            index = at([&last](const Design::Look &look) { return look.name == last; });
+        }
+        // From no look at all, up starts at the first and down at the last.
+        const int count = int(m_looks.size());
+        applyLook(index < 0 ? (step > 0 ? 0 : count - 1) : (index + step + count) % count);
+    }
+}
+
 void Backend::applyLook(int index) {
     if (index < 0 || index >= m_looks.size())
         return;
     setCurrent(m_looks[index].lighting);
     scheduleLighting();
+    // Where the knob goes on from once the lighting stops matching the look.
+    m_settings->setValue(knobLookKey, m_looks[index].name);
     const Design::MouseZones &mouse = m_looks[index].mouse;
     if (!mouse.isEmpty()) {
         for (auto it = mouse.begin(); it != mouse.end(); ++it)

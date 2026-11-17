@@ -12,6 +12,7 @@ DEFINES += OMAGLOW_VERSION=\\\"$$OMAGLOW_VERSION\\\"
 HEADERS += \
     src/live.h \
     src/knob.h \
+    src/knobservice.h \
     src/backend.h \
     src/device.h \
     src/clockservice.h \
@@ -33,6 +34,7 @@ HEADERS += \
 SOURCES += \
     src/live.cpp \
     src/knob.cpp \
+    src/knobservice.cpp \
     src/main.cpp \
     src/backend.cpp \
     src/device.cpp \

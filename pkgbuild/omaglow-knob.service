@@ -1,0 +1,12 @@
+[Unit]
+Description=Do the ROG Azoth knob functions left to the host
+Documentation=file:///usr/share/doc/omaglow/README.md
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/omaglow knob
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target

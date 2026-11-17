@@ -39,6 +39,14 @@ stored on the keyboard and survive reboots and other computers.
   on a drawn keyboard; reset them all at once.
 - Choose which functions the control knob switches between, and what its
   custom function does when turned up, pressed, or turned down.
+- The knob's lighting brightness, OLED brightness and lighting effect
+  functions keep working: once a program talks to the keyboard it stops doing
+  them itself and only reports the turns, so Omaglow does them. Brightness
+  moves ten points a notch, and lighting effect goes to the next or previous
+  look. A user service (`omaglow-knob.service`, running `omaglow knob`) does
+  this while the app is closed; the app turns it on when it finds the keyboard.
+  The keyboard can't be asked which function is on, so after the first start
+  switch the knob's function once.
 - Five profiles plus the default one, each with its own lighting, keys and
   knob, picked from the sidebar (Fn + 1–6 on the keyboard switches too).
 - Paint your own lighting key by key in Studio: any color per key, fill,

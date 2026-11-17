@@ -35,4 +35,4 @@ if [ -f "$HOOKS/50-azoth" ]; then
   rm -f "$HOOKS/50-azoth"
 fi
 # Running services keep the old binary until they restart.
-systemctl --user try-restart omaglow-lights.service omaglow-clock.service omaglow-music.service 2>/dev/null || true
+systemctl --user try-restart omaglow-lights.service omaglow-clock.service omaglow-music.service omaglow-knob.service 2>/dev/null || true

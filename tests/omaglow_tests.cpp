@@ -23,6 +23,7 @@
 #include "lightservice.h"
 #include "live.h"
 #include "knob.h"
+#include "knobservice.h"
 #include "filepicker.h"
 #include "keymap.h"
 #include "clockservice.h"
@@ -673,6 +674,157 @@ private slots:
         node("hidraw9", "00001A83", QByteArray::fromHex("05010906a10175019578"));
         node("hidraw3", "0000C52B", QByteArray::fromHex("05010906a101"));
         QCOMPARE(LiveFeed::keyboardInputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw5", "/dev/hidraw9"}));
+    }
+
+    // Once a program talks to the keyboard, it leaves three knob functions to it.
+    void backendDoesTheKnobFunctionsTheKeyboardLeavesToIt()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        const auto active = [&] {
+            for (const QVariant &look : backend->looks())
+                if (look.toMap().value("active").toBool())
+                    return look.toMap().value("name").toString();
+            return QString();
+        };
+        // No looks yet: turning does nothing.
+        backend->knobTurned(Protocol::KnobEffect, 1);
+        backend->setEffect(Protocol::Static);
+        backend->setBrightness(50);
+        for (const char *color : {"#ff0000", "#00ff00", "#0000ff"}) {
+            backend->setColor1(QColor(color));
+            backend->saveLook(color);
+        }
+        QCOMPARE(active(), QString("#0000ff"));
+
+        // Lighting effect: the next look, around the ends of the list.
+        backend->knobTurned(Protocol::KnobEffect, 1);
+        QCOMPARE(active(), QString("#ff0000"));
+        backend->knobTurned(Protocol::KnobEffect, -1);
+        QCOMPARE(active(), QString("#0000ff"));
+        backend->knobTurned(Protocol::KnobEffect, -1);
+        QCOMPARE(active(), QString("#00ff00"));
+        link->sent.clear();
+        backend->flush();
+        QVERIFY(!link->sent.isEmpty());
+
+        // Lighting brightness: ten points a notch, kept within 0 and 100.
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, 1);
+        QCOMPARE(backend->brightness(), 60);
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, -1);
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, -1);
+        QCOMPARE(backend->brightness(), 40);
+        backend->setBrightness(95);
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, 1);
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, 1);
+        QCOMPARE(backend->brightness(), 100);
+        backend->setBrightness(5);
+        backend->knobTurned(Protocol::KnobKeyboardBrightness, -1);
+        QCOMPARE(backend->brightness(), 0);
+        // The lighting no longer matches a look; turning goes on from the last one.
+        backend->knobTurned(Protocol::KnobEffect, 1);
+        QCOMPARE(active(), QString("#0000ff"));
+
+        // OLED brightness.
+        backend->flush();
+        link->sent.clear();
+        QCOMPARE(backend->oledBrightness(), 100);
+        backend->knobTurned(Protocol::KnobOledBrightness, -1);
+        QCOMPARE(backend->oledBrightness(), 90);
+        QVERIFY(link->sent.contains(Protocol::oledBrightness(90)));
+
+        // Volume, media and the custom function are the keyboard's own.
+        link->sent.clear();
+        for (int function : {int(Protocol::KnobVolume), int(Protocol::KnobMedia), int(Protocol::KnobCustom)})
+            backend->knobTurned(function, 1);
+        backend->flush();
+        QVERIFY(link->sent.isEmpty());
+        QCOMPARE(active(), QString("#0000ff"));
+        QCOMPARE(backend->oledBrightness(), 90);
+    }
+
+    // With the app closed, `omaglow knob` does the knob functions.
+    void knobServiceActsOnlyWhileTheAppIsClosed()
+    {
+        QTemporaryDir dir;
+        QSettings settings(dir.path() + "/settings.ini", QSettings::IniFormat);
+        QList<QByteArray> sent;
+        int made = 0;
+        bool appOpen = false;
+        KnobService service(
+            &settings,
+            [&]() -> Backend * {
+                ++made;
+                auto *own = new QSettings(dir.path() + "/settings.ini", QSettings::IniFormat);
+                auto *picker = new FakePicker;
+                auto *backend = new Backend(
+                    [] { return DeviceNode{DeviceNode::Found, "/dev/null", "1A83"}; },
+                    [&sent](const QString &) -> Link * { auto *link = new FakeLink; link->log = &sent; return link; },
+                    own, picker);
+                own->setParent(backend);
+                picker->setParent(backend);
+                return backend;
+            },
+            [&] { return appOpen; });
+
+        service.turned(Protocol::KnobOledBrightness, -1);
+        QCOMPARE(made, 1);
+        QVERIFY(sent.contains(Protocol::oledBrightness(90)));
+        // Notches in a row share one backend.
+        service.turned(Protocol::KnobOledBrightness, -1);
+        QCOMPARE(made, 1);
+        QVERIFY(sent.contains(Protocol::oledBrightness(80)));
+
+        // Lighting is sent a moment after the change; resting sends what is pending
+        // and lets the backend go, so the next turn reads the settings again.
+        service.turned(Protocol::KnobKeyboardBrightness, -1);
+        sent.clear();
+        service.rest();
+        QVERIFY(!sent.isEmpty());
+        service.turned(Protocol::KnobOledBrightness, -1);
+        QCOMPARE(made, 2);
+        QVERIFY(sent.contains(Protocol::oledBrightness(70)));
+        service.rest();
+
+        // An open app listens itself.
+        appOpen = true;
+        sent.clear();
+        service.turned(Protocol::KnobOledBrightness, -1);
+        QCOMPARE(made, 2);
+        QVERIFY(sent.isEmpty());
+    }
+
+    // The app keeps that service on while there is an Azoth.
+    void backendKeepsTheKnobServiceOn()
+    {
+        QTemporaryDir dir;
+        FakeLink *link = nullptr;
+        auto backend = makeBackend(dir, &link);
+        QStringList commands;
+        bool enabled = false;
+        backend->setServiceRunner([&](const QStringList &args, QString *) {
+            commands.append(args.join(' '));
+            return args.contains("is-enabled") && !enabled ? 1 : 0;
+        });
+        backend->syncKnobService();
+        QCOMPARE(commands, QStringList({"--user is-enabled --quiet omaglow-knob.service",
+                                        "--user enable --now omaglow-knob.service"}));
+        commands.clear();
+        enabled = true;
+        backend->syncKnobService();
+        QCOMPARE(commands, QStringList({"--user is-enabled --quiet omaglow-knob.service"}));
+
+        // No keyboard, no service.
+        QTemporaryDir other;
+        auto *settings = new QSettings(other.path() + "/settings.ini", QSettings::IniFormat);
+        Backend none([] { return DeviceNode{}; }, [](const QString &) -> Link * { return nullptr; }, settings,
+                     new FakePicker);
+        settings->setParent(&none);
+        commands.clear();
+        none.setServiceRunner([&](const QStringList &args, QString *) { commands.append(args.join(' ')); return 1; });
+        none.syncKnobService();
+        QVERIFY(commands.isEmpty());
     }
 
     void knobListenerFollowsTheFunctionAndSkipsMediaTurns()

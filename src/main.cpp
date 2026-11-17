@@ -14,6 +14,7 @@
 #include "appinfo.h"
 #include "backend.h"
 #include "clockservice.h"
+#include "knobservice.h"
 #include "lightservice.h"
 #include "musicservice.h"
 #include <QSettings>
@@ -97,6 +98,25 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    // `omaglow knob` does the knob functions the keyboard leaves to the host
+    // (lighting and OLED brightness, lighting effect) while the app is closed;
+    // the omaglow-knob.service user unit runs it.
+    if (argc > 1 && QByteArray(argv[1]) == "knob") {
+        QCoreApplication app(argc, argv);
+        app.setApplicationName(AppInfo::Name);
+        app.setOrganizationName(AppInfo::Name);
+        QSettings settings;
+        KnobService knob(
+            &settings, [] { return new Backend; },
+            [] {
+                // Held by the open app; let go at once so the app can take it.
+                QLockFile open(appLockPath());
+                return !open.tryLock(0);
+            });
+        knob.start();
+        return app.exec();
+    }
+
     QGuiApplication app(argc, argv);
     // Tells `omaglow theme-sync` the app is open; released when it quits.
     QLockFile appLock(appLockPath());
@@ -130,6 +150,11 @@ int main(int argc, char *argv[]) {
     Backend backend;
     backend.syncClockService();
     backend.syncLightsService();
+    backend.syncKnobService();
+    // The keyboard leaves three knob functions to whoever talks to it.
+    KnobListener knob(&uiSettings);
+    QObject::connect(&knob, &KnobListener::turned, &backend, &Backend::knobTurned);
+    knob.start();
     // A theme picked while the app was closed and its hook missed shows now.
     const auto followTheme = [&] {
         if (backend.followTheme())

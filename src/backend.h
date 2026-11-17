@@ -223,6 +223,9 @@ public:
     // Reads whether the lighting service is enabled, in case it changed
     // outside the app.
     void syncLightsService();
+    // Turns on the service that does the knob functions with the app closed,
+    // when there is an Azoth; it is left on afterwards.
+    void syncKnobService();
 
     QVariantList looks() const;
     // Saves the current lighting under the name, replacing a look with the
@@ -258,6 +261,10 @@ public:
     // Looks for the mouse again; the poll does this every couple of seconds.
     void refreshMouse();
     Q_INVOKABLE void applyLook(int index);
+    // A notch of the knob in a function the keyboard leaves to the host once a
+    // program talks to it: lighting brightness, OLED brightness, or lighting
+    // effect, which goes to the next look (step 1) or the one before (-1).
+    Q_INVOKABLE void knobTurned(int function, int step);
     Q_INVOKABLE void deleteLook(int index);
     void setOledBrightness(int value);
 
