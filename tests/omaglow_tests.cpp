@@ -22,6 +22,7 @@
 #include "device.h"
 #include "lightservice.h"
 #include "live.h"
+#include "knob.h"
 #include "filepicker.h"
 #include "keymap.h"
 #include "clockservice.h"
@@ -672,6 +673,82 @@ private slots:
         node("hidraw9", "00001A83", QByteArray::fromHex("05010906a10175019578"));
         node("hidraw3", "0000C52B", QByteArray::fromHex("05010906a101"));
         QCOMPARE(LiveFeed::keyboardInputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw5", "/dev/hidraw9"}));
+    }
+
+    void knobListenerFollowsTheFunctionAndSkipsMediaTurns()
+    {
+        const auto hex = [](const char *bytes) { return QByteArray::fromHex(bytes).leftJustified(21, '\0'); };
+        // What the keyboard says on its third interface (captured on the cable).
+        QCOMPARE(Knob::parse(hex("037201")).kind, Knob::Event::Turned);
+        QCOMPARE(Knob::parse(hex("037201")).value, 1);
+        QCOMPARE(Knob::parse(hex("037204")).value, -1);
+        QCOMPARE(Knob::parse(hex("037202")).kind, Knob::Event::Nothing); // the click
+        QCOMPARE(Knob::parse(hex("037200")).kind, Knob::Event::Nothing); // let go
+        QCOMPARE(Knob::parse(hex("0391000003")).kind, Knob::Event::FunctionChanged);
+        QCOMPARE(Knob::parse(hex("0391000003")).value, 3);
+        QCOMPARE(Knob::parse(QByteArray::fromHex("01000200")).kind, Knob::Event::Media);
+        QCOMPARE(Knob::parse(QByteArray::fromHex("01000000")).kind, Knob::Event::Nothing);
+        QCOMPARE(Knob::parse(hex("03710040")).kind, Knob::Event::Nothing);
+        QCOMPARE(Knob::parse(QByteArray()).kind, Knob::Event::Nothing);
+
+        QTemporaryDir dir;
+        QSettings settings(dir.filePath("omaglow.conf"), QSettings::IniFormat);
+        QList<QPair<int, int>> turns;
+        {
+            KnobListener knob(&settings);
+            connect(&knob, &KnobListener::turned, [&](int function, int step) { turns.append({function, step}); });
+            // The keyboard can't be asked which function is on: nothing until it says.
+            knob.feed(hex("037201"), 0);
+            QVERIFY(turns.isEmpty());
+            knob.feed(hex("0391000002"), 100);
+            knob.feed(hex("037201"), 200);
+            knob.feed(hex("037200"), 210);
+            knob.feed(hex("037204"), 300);
+            knob.feed(hex("037202"), 400);
+            QCOMPARE(turns, (QList<QPair<int, int>>{{Protocol::KnobKeyboardBrightness, 1},
+                                                    {Protocol::KnobKeyboardBrightness, -1}}));
+            // Volume and media are the keyboard's own.
+            turns.clear();
+            knob.feed(hex("0391000000"), 500);
+            knob.feed(hex("037201"), 600);
+            knob.feed(hex("0391000001"), 700);
+            knob.feed(hex("037204"), 800);
+            knob.feed(hex("0391000007"), 900);
+            knob.feed(hex("037204"), 1000);
+            QVERIFY(turns.isEmpty());
+            knob.feed(hex("0391000004"), 1100);
+        }
+        // The function is remembered for the next run.
+        KnobListener knob(&settings);
+        connect(&knob, &KnobListener::turned, [&](int function, int step) { turns.append({function, step}); });
+        knob.feed(hex("037204"), 0);
+        QCOMPARE(turns, (QList<QPair<int, int>>{{Protocol::KnobEffect, -1}}));
+        // A media key sent with the turn means the keyboard did it: the
+        // remembered function was wrong, so it is forgotten.
+        turns.clear();
+        knob.feed(QByteArray::fromHex("01000200"), 1000);
+        knob.feed(hex("037201"), 1005);
+        knob.feed(hex("037201"), 2000);
+        QVERIFY(turns.isEmpty());
+        QVERIFY(!settings.contains("knob/function"));
+        // A media key pressed some other time doesn't count.
+        knob.feed(hex("0391000003"), 3000);
+        knob.feed(QByteArray::fromHex("01000200"), 3100);
+        knob.feed(hex("037201"), 4000);
+        QCOMPARE(turns, (QList<QPair<int, int>>{{Protocol::KnobOledBrightness, 1}}));
+
+        // The interface that carries them: the Azoth's vendor page ffc0.
+        QTemporaryDir sys;
+        auto node = [&](const QString &name, const QByteArray &id, const QByteArray &descriptor) {
+            QVERIFY(QDir(sys.path()).mkpath("class/hidraw/" + name + "/device"));
+            write(sys.path() + "/class/hidraw/" + name + "/device/uevent", "HID_ID=0003:00000B05:" + id + "\n");
+            write(sys.path() + "/class/hidraw/" + name + "/device/report_descriptor", descriptor);
+        };
+        node("hidraw0", "00001A83", QByteArray::fromHex("050c0901a1018501c006c0ff0901a1018503"));
+        node("hidraw7", "00001A83", QByteArray::fromHex("0600ff0901a101"));
+        node("hidraw8", "00001A83", QByteArray::fromHex("05010906a101"));
+        node("hidraw3", "0000C52B", QByteArray::fromHex("06c0ff0901a1018503"));
+        QCOMPARE(Knob::inputNodes(sys.path(), "/dev"), QStringList({"/dev/hidraw0"}));
     }
 
     void shockwaveAndEmbersBlendOverTheLayersUnder()
