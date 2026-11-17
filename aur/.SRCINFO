@@ -17,6 +17,6 @@ pkgbase = omaglow
 	optdepends = asusctl: ASUS laptop keyboard lighting
 	optdepends = hyprland: the Workspaces layer
 	source = git+https://github.com/peraltcant/omaglow.git#tag=v0.31.0
-	sha256sums = 9cbebd45a43d6939b138dc2b0fc146815f52b61dea217813112fc340ff294d4c
+	sha256sums = 48ad4d77c6207519008c1a48e636ada0be4d0e3e4cf0083c5e262fcb94ea6fa5
 
 pkgname = omaglow
